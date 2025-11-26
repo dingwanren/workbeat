@@ -1,1 +1,3 @@
 # code-analyzer
+
+使用 pnpm 进行包管理
