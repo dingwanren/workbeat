@@ -23,21 +23,11 @@ export function calculateBasicMetrics(commits: CommitData[]): AuthorMetrics[] {
     
     // 计算各项指标
     const commitCount = authorCommits.length;
-    
-    // 模拟增删行数（暂时使用随机数）
-    let totalInsertions = 0;
-    let totalDeletions = 0;
-    
-    for (const commit of authorCommits) {
-      // 生成基于提交哈希的随机但确定的增删行数
-      const hashValue = getDeterministicValueFromHash(commit.hash);
-      const insertions = 10 + (hashValue % 91); // 10-100行
-      const deletions = 5 + (hashValue % 51);   // 5-55行
-      
-      totalInsertions += insertions;
-      totalDeletions += deletions;
-    }
-    
+
+    // 累计真实的增删行数 from the commits
+    const totalInsertions = authorCommits.reduce((sum, commit) => sum + (commit.insertions || 0), 0);
+    const totalDeletions = authorCommits.reduce((sum, commit) => sum + (commit.deletions || 0), 0);
+
     const netChanges = totalInsertions - totalDeletions;
     
     // 找到首次和最后提交时间
@@ -62,15 +52,3 @@ export function calculateBasicMetrics(commits: CommitData[]): AuthorMetrics[] {
   return authorMetrics;
 }
 
-/**
- * 从提交哈希生成一个确定性的数值（用于模拟数据）
- * @param hash 提交哈希
- * @returns 0-999的数值
- */
-function getDeterministicValueFromHash(hash: string): number {
-  let hashValue = 0;
-  for (let i = 0; i < Math.min(hash.length, 8); i++) {
-    hashValue = (hashValue * 31 + hash.charCodeAt(i)) % 1000;
-  }
-  return Math.abs(hashValue);
-}

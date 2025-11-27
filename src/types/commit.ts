@@ -14,6 +14,15 @@ export interface RawCommitLog {
 }
 
 /**
+ * 文件变更详情
+ */
+export interface FileChange {
+  filename: string;
+  insertions: number;
+  deletions: number;
+}
+
+/**
  * 统一格式的提交数据结构
  */
 export interface CommitData {
@@ -24,6 +33,10 @@ export interface CommitData {
   };
   timestamp: Date;
   message: string;
+  insertions: number;
+  deletions: number;
+  filesChanged: number;
+  fileDetails?: FileChange[];
 }
 
 /**
