@@ -10,5 +10,6 @@ export default defineConfig({
   target: 'es2022',
   outExtension: () => ({ js: '.js' }),
   shims: true,
-  splitting: false
+  splitting: false,
+  sourcemap: true
 });
