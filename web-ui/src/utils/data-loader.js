@@ -1,34 +1,34 @@
 /**
  * 数据加载工具
- * 从 analysis-result.json 文件加载分析数据
+ * 从 API 接口加载分析数据
  */
 
 export async function loadData() {
   try {
-    // 尝试从根目录加载分析结果
-    const response = await fetch('./analysis-result.json');
-    
+    // 从 API 接口获取分析结果
+    const response = await fetch('/api/analysis-data');
+
     if (!response.ok) {
       throw new Error(`加载数据失败: ${response.status} ${response.statusText}`);
     }
-    
+
     const data = await response.json();
-    
+
     // 验证数据结构
     if (!data || !data.authorMetrics || !data.commits) {
       throw new Error('分析结果数据格式不正确，缺少必要的字段');
     }
-    
+
     return data;
   } catch (error) {
     console.error('加载分析数据时发生错误:', error);
-    
+
     // 如果加载失败，提供模拟数据用于开发
     if (process.env.NODE_ENV === 'development') {
       console.warn('使用模拟数据进行开发');
       return generateMockData();
     }
-    
+
     throw error;
   }
 }

@@ -50,7 +50,7 @@ export class GitReader {
       return commits;
     } catch (error) {
       console.error('读取Git日志时发生错误:', error);
-      throw new Error(`无法读取仓库 ${this.git.cwd()} 的提交历史: ${error}`);
+      throw new Error(`无法读取仓库的提交历史: ${error}`);
     }
   }
 
@@ -98,7 +98,7 @@ export class GitReader {
   }> {
     try {
       // 使用 git show 命令获取提交的统计信息
-      const showResult = await this.git.show([commitHash, '--numstat', '--format=']);
+      const showResult = await this.git.show([commitHash, '--numstat', '--format=']).catch(() => '');
 
       // 解析 --numstat 输出格式
       // 格式: insertion\tdeletion\tfilename

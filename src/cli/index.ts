@@ -3,11 +3,11 @@ import { analyzeRepository } from '../core/analyzer.js';
 import { AuthorMetrics } from '../types/metrics.js';
 import { GitReader } from '../core/git-reader.js';
 import { DataExporter } from '../visualizer/data-exporter.js';
-import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
 import open from 'open';
+import { WebServer } from '../server/index.js';
 
 // 获取当前文件的目录路径
 const __filename = fileURLToPath(import.meta.url);
@@ -38,59 +38,29 @@ program
 
         console.log('数据分析完成，正在导出数据...');
 
-        // 导出分析结果为JSON文件
+        // 导出分析结果为JSON文件 (use a standard name for the web API)
+        const dataFilePath = path.join(__dirname, '../../analysis-data.json');
         const exporter = new DataExporter(repoPath, metrics, commits);
-        await exporter.exportToFile(options.output);
+        await exporter.exportToFile(dataFilePath);
 
-        console.log('启动Vue开发服务器...');
+        console.log('启动Express服务器...');
 
-        // 启动Vite开发服务器
-        const webUiDir = path.join(__dirname, '../../web-ui');
+        // 启动Express服务器
+        const server = new WebServer({
+          port: parseInt(options.port || '3000'),
+          dataFile: dataFilePath
+        });
 
-        // 检查web-ui目录是否存在
+        // Start the server and then open the browser
+        await server.start();
+
+        const url = `http://localhost:${options.port || '3000'}`;
+        console.log(`正在打开浏览器访问: ${url}`);
         try {
-          await fs.access(webUiDir);
-        } catch (error) {
-          console.error(`web-ui目录不存在，请确保在 ${webUiDir} 路径下存在Vue应用`);
-          process.exit(1);
+          await open(url);
+        } catch (err) {
+          console.log(`自动打开浏览器失败，请手动访问: ${url}`);
         }
-
-        // 检查package.json是否存在
-        const packageJsonPath = path.join(webUiDir, 'package.json');
-        try {
-          await fs.access(packageJsonPath);
-        } catch (error) {
-          console.error(`web-ui/package.json文件不存在`);
-          process.exit(1);
-        }
-
-        // 启动Vite开发服务器
-        const child = spawn('npx', ['vite', '--host', 'localhost', '--port', options.port || '3000'], {
-          cwd: webUiDir,
-          stdio: 'inherit',
-          shell: true
-        });
-
-        child.on('error', (err) => {
-          console.error('启动Vite开发服务器时发生错误:', err);
-          console.log('请确保已安装Vite: npm install -g create-vite 或 pnpm add -g create-vite');
-        });
-
-        // 监听子进程退出事件
-        child.on('close', (code) => {
-          console.log(`Vite服务器已关闭，退出码: ${code}`);
-        });
-
-        // 等待服务器启动后打开浏览器
-        setTimeout(async () => {
-          const url = `http://localhost:${options.port || '3000'}`;
-          console.log(`正在打开浏览器访问: ${url}`);
-          try {
-            await open(url);
-          } catch (err) {
-            console.log(`自动打开浏览器失败，请手动访问: ${url}`);
-          }
-        }, 3000); // 等待3秒以确保服务器启动
 
       } catch (error) {
         console.error('分析仓库时发生错误:', error);
