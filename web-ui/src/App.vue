@@ -71,10 +71,10 @@
 
 <script>
 import { ref, onMounted } from 'vue'
-import TeamAnalysis from './components/TeamAnalysis.vue'
-import WorkTimeChart from './components/WorkTimeChart.vue'
-import CodeTrendChart from './components/CodeTrendChart.vue'
-import CommitScatterPlot from './components/CommitScatterPlot.vue'
+// import TeamAnalysis from './components/TeamAnalysis.vue'
+// import WorkTimeChart from './components/WorkTimeChart.vue'
+// import CodeTrendChart from './components/CodeTrendChart.vue'
+// import CommitScatterPlot from './components/CommitScatterPlot.vue'
 import { loadData } from './utils/data-loader.js'
 
 export default {

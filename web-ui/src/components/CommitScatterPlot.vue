@@ -22,36 +22,27 @@ export default {
     VChart
   },
   setup(props) {
-    // 计算每个作者的文件数量和代码行数
+    // 计算每个提交的文件数量和代码行数（以提交为粒度）
     const computeAuthorScatterData = () => {
-      const authorStats = {}
-      
-      // 按作者分组计算
-      props.data.commits.forEach(commit => {
-        const authorKey = `${commit.author.name} <${commit.author.email}>`
-        
-        if (!authorStats[authorKey]) {
-          authorStats[authorKey] = {
-            filesChanged: 0,
-            codeLines: 0
-          }
-        }
-        
-        authorStats[authorKey].filesChanged += commit.filesChanged || 0
-        authorStats[authorKey].codeLines += (commit.insertions || 0) + (commit.deletions || 0)
-      })
-      
-      // 转换为散点图数据格式
-      return Object.entries(authorStats).map(([author, stats], index) => {
+      // 直接为每个提交创建数据点
+      const commitData = props.data.commits.map((commit, index) => {
+        const authorInfo = `${commit.author.name} <${commit.author.email}>`
         return [
-          stats.filesChanged,  // X轴：文件数量
-          stats.codeLines,     // Y轴：代码行数
-          author,              // 名称
-          index + 1            // 序号
+          commit.filesChanged || 0,  // X轴：文件数量
+          (commit.insertions || 0) + (commit.deletions || 0), // Y轴：代码行数
+          authorInfo,                // 名称
+          index + 1                  // 序号
         ]
       })
+
+      // 在浏览器控制台输出调试信息
+      if (typeof window !== 'undefined') {
+        console.log('CommitScatterPlot data:', commitData)
+        console.log('Number of commits:', commitData.length)
+      }
+      return commitData
     }
-    
+
     const scatterData = computed(() => computeAuthorScatterData())
     
     const chartOption = computed(() => {

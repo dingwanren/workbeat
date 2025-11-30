@@ -43,6 +43,8 @@ program
         const exporter = new DataExporter(repoPath, metrics, commits);
         await exporter.exportToFile(dataFilePath);
 
+        console.log('准备启动可视化服务器...');
+        console.log('当前工作目录:', process.cwd());
         console.log('启动Express服务器...');
 
         // 启动Express服务器
