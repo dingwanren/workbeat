@@ -8,11 +8,14 @@
   },
   "type": "module",
   "scripts": {
-    "build": "tsup",
+    "build": "npm run install-web && tsup",
     "dev": "tsup --watch",
     "start": "node dist/index.js",
     "lint": "eslint src/**/*.ts",
-    "format": "prettier --write src/**/*.ts"
+    "format": "prettier --write src/**/*.ts",
+    "install-web": "cd web-ui && npm install",
+    "dev-vue": "cd web-ui && npm run dev",
+    "build-vue": "cd web-ui && npm run build"
   },
   "keywords": [
     "git",
