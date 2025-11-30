@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <header class="header">
-      <h1>Git 仓库团队分析仪表板</h1>
+      <h1>Git 仓库分析仪表板</h1>
     </header>
     
     <main class="main-content">
@@ -71,10 +71,10 @@
 
 <script>
 import { ref, onMounted } from 'vue'
-// import TeamAnalysis from './components/TeamAnalysis.vue'
-// import WorkTimeChart from './components/WorkTimeChart.vue'
-// import CodeTrendChart from './components/CodeTrendChart.vue'
-// import CommitScatterPlot from './components/CommitScatterPlot.vue'
+import TeamAnalysis from './components/TeamAnalysis.vue'
+import WorkTimeChart from './components/WorkTimeChart.vue'
+import CodeTrendChart from './components/CodeTrendChart.vue'
+import CommitScatterPlot from './components/CommitScatterPlot.vue'
 import { loadData } from './utils/data-loader.js'
 
 export default {

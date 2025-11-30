@@ -29,33 +29,22 @@ export class WebServer {
   constructor(options: ServerOptions) {
     this.options = {
       port: options.port || 3000,
-      staticDir: options.staticDir || path.join(__dirname, '../../../dist/static'),
+      staticDir: options.staticDir || path.resolve(process.cwd(), 'dist', 'static'),
       dataFile: options.dataFile || path.join(__dirname, '../../../analysis-data.json'),
     };
 
     // 静态文件调试信息
-    console.log('=== 静态文件调试信息 ===');
-    console.log('当前文件路径:', __dirname);
-    console.log('静态文件期望路径:', this.options.staticDir);
+    console.log('🔍 调试信息:');
+    console.log('当前工作目录:', process.cwd());
+    console.log('静态文件绝对路径:', this.options.staticDir);
     console.log('路径是否存在:', existsSync(this.options.staticDir));
 
     if (existsSync(this.options.staticDir)) {
       const files = readdirSync(this.options.staticDir);
       console.log('静态目录内容:', files);
-
-      // 检查index.html是否存在
-      const indexPath = path.join(this.options.staticDir, 'index.html');
-      console.log('index.html路径:', indexPath);
-      console.log('index.html是否存在:', existsSync(indexPath));
-
-      if (existsSync(indexPath)) {
-        const content = readFileSync(indexPath, 'utf-8');
-        console.log('index.html前200字符:', content.substring(0, 200));
-      }
     } else {
       console.log('❌ 静态文件目录不存在！');
     }
-    console.log('========================');
 
     this.app = express();
 
@@ -75,30 +64,29 @@ export class WebServer {
       etag: false,
       lastModified: false,
       setHeaders: (res, path) => {
-        // 为开发环境设置不缓存头，避免缓存问题
-        if (process.env.NODE_ENV !== 'production') {
-          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-          res.setHeader('Pragma', 'no-cache');
-          res.setHeader('Expires', '0');
-        }
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
       }
     }));
     this.app.use(express.static(this.options.staticDir, {
       etag: false,
       lastModified: false,
       setHeaders: (res, path) => {
-        // 为开发环境设置不缓存头，避免缓存问题
-        if (process.env.NODE_ENV !== 'production') {
-          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-          res.setHeader('Pragma', 'no-cache');
-          res.setHeader('Expires', '0');
-        }
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
       }
     }));
 
-    // 记录所有请求
+    // 路由调试中间件
     this.app.use((req, res, next) => {
-      console.log(`请求: ${req.method} ${req.url}`);
+      console.log(`📨 请求: ${req.method} ${req.url}`);
+      if (req.url.includes('.js') || req.url.includes('.css')) {
+        const filePath = path.join(this.options.staticDir, req.url);
+        console.log(`📄 请求文件: ${filePath}`);
+        console.log(`📄 文件存在: ${existsSync(filePath)}`);
+      }
       next();
     });
 
@@ -113,11 +101,30 @@ export class WebServer {
       }
     });
 
+    // 根路由返回正确的index.html
+    this.app.get('/', (req, res) => {
+      const indexPath = path.join(this.options.staticDir, 'index.html');
+      console.log('🏠 服务首页:', indexPath);
+      console.log('🏠 首页存在:', existsSync(indexPath));
+
+      if (existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send('index.html not found');
+      }
+    });
+
     // Catch-all route to serve the Vue app for client-side routing
     this.app.get('*', (req: Request, res: Response) => {
       const indexPath = path.join(this.options.staticDir, 'index.html');
-      console.log(`[Catch-all Route] Serving index.html for path: ${req.path}, index path: ${indexPath}`);
-      res.sendFile(indexPath);
+      console.log('🏠 服务首页:', indexPath);
+      console.log('🏠 首页存在:', existsSync(indexPath));
+
+      if (existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send('index.html not found');
+      }
     });
   }
 
