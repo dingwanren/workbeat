@@ -45,19 +45,20 @@ export class WebServer {
 
   constructor(options: ServerOptions) {
     // 确保静态文件路径基于包安装目录，数据文件路径基于当前工作目录
-    const packageStaticDir = path.resolve(__dirname, '..', 'dist', 'static');
+    const packageStaticDir = path.resolve(__dirname, '..', 'static');
     const currentWorkingDir = process.cwd();
 
     this.options = {
       port: options.port || 3000,
-      staticDir: options.staticDir ||
-        (existsSync(packageStaticDir) ? packageStaticDir : path.resolve(currentWorkingDir, 'dist', 'static')),
+      staticDir: options.staticDir || packageStaticDir,
+        // (existsSync(packageStaticDir) ? packageStaticDir : path.resolve(currentWorkingDir, 'dist', 'static')),
       dataFile: options.dataFile || path.resolve(currentWorkingDir, 'analysis-data.json'),
     };
 
     // 静态文件调试信息
     console.log('🔍 调试信息:');
     console.log('当前工作目录:', process.cwd());
+    console.log('packageStaticDir:', packageStaticDir);
     console.log('项目根目录:', findProjectRoot(process.cwd()));
     console.log('静态文件绝对路径:', this.options.staticDir);
     console.log('数据文件绝对路径:', this.options.dataFile);
