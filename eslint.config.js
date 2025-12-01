@@ -50,6 +50,8 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': 'error',
       // 禁止使用 any
       '@typescript-eslint/no-explicit-any': 'error',
+      // 要求使用单引号
+      'quotes': ['error', 'single'],
       // 要求在接口上使用 'I' 前缀（可选）
       '@typescript-eslint/naming-convention': [
         'error',

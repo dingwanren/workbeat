@@ -22,28 +22,55 @@ interface InternalServerOptions {
   dataFile: string;
 }
 
+// 辅助函数：找到项目根目录
+function findProjectRoot(currentDir: string): string {
+  let dir = currentDir;
+  const rootMarkerFiles = ['package.json', 'pnpm-lock.yaml', 'yarn.lock', 'package-lock.json'];
+
+  // 向上查找直到找到项目根目录标记文件或到达系统根目录
+  while (path.dirname(dir) !== dir) { // 不是系统根目录
+    if (rootMarkerFiles.some(marker => existsSync(path.join(dir, marker)))) {
+      return dir;
+    }
+    dir = path.dirname(dir);
+  }
+
+  // 如果没找到标记文件，返回当前目录作为根目录
+  return currentDir;
+}
+
 export class WebServer {
   private app: express.Application;
   private options: Required<ServerOptions>;
 
   constructor(options: ServerOptions) {
+    // 确定项目根目录
+    const projectRoot = findProjectRoot(process.cwd());
+
     this.options = {
       port: options.port || 3000,
-      staticDir: options.staticDir || path.resolve(process.cwd(), 'dist', 'static'),
-      dataFile: options.dataFile || path.join(__dirname, '../../../analysis-data.json'),
+      staticDir: options.staticDir || path.resolve(projectRoot, 'dist', 'static'),
+      dataFile: options.dataFile || path.resolve(projectRoot, 'analysis-data.json'),
     };
 
     // 静态文件调试信息
     console.log('🔍 调试信息:');
     console.log('当前工作目录:', process.cwd());
+    console.log('项目根目录:', findProjectRoot(process.cwd()));
     console.log('静态文件绝对路径:', this.options.staticDir);
-    console.log('路径是否存在:', existsSync(this.options.staticDir));
+    console.log('数据文件绝对路径:', this.options.dataFile);
+    console.log('静态文件路径是否存在:', existsSync(this.options.staticDir));
+    console.log('数据文件路径是否存在:', existsSync(this.options.dataFile));
 
     if (existsSync(this.options.staticDir)) {
       const files = readdirSync(this.options.staticDir);
       console.log('静态目录内容:', files);
     } else {
       console.log('❌ 静态文件目录不存在！');
+    }
+
+    if (!existsSync(this.options.dataFile)) {
+      console.log('⚠️ 数据文件不存在:', this.options.dataFile);
     }
 
     this.app = express();
@@ -63,7 +90,7 @@ export class WebServer {
     this.app.use('/assets', express.static(path.join(this.options.staticDir, 'assets'), {
       etag: false,
       lastModified: false,
-      setHeaders: (res, path) => {
+      setHeaders: (res, path, stat) => {
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.set('Pragma', 'no-cache');
         res.set('Expires', '0');
@@ -72,7 +99,7 @@ export class WebServer {
     this.app.use(express.static(this.options.staticDir, {
       etag: false,
       lastModified: false,
-      setHeaders: (res, path) => {
+      setHeaders: (res, path, stat) => {
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.set('Pragma', 'no-cache');
         res.set('Expires', '0');
@@ -88,6 +115,28 @@ export class WebServer {
         console.log(`📄 文件存在: ${existsSync(filePath)}`);
       }
       next();
+    });
+
+    // 静态文件目录不存在时的错误处理中间件
+    this.app.use((req, res, next) => {
+      if (!existsSync(this.options.staticDir)) {
+        console.error('❌ 静态文件目录不存在:', this.options.staticDir);
+        if (req.url.startsWith('/api/')) {
+          // API 请求继续处理
+          next();
+        } else {
+          // 静态文件请求返回错误
+          res.status(500).send(`
+            <h1>错误: 静态文件目录不存在</h1>
+            <p>请确保已构建前端项目 (run build command)</p>
+            <p>期望位置: ${this.options.staticDir}</p>
+            <p>当前工作目录: ${process.cwd()}</p>
+            <p>项目根目录: ${findProjectRoot(process.cwd())}</p>
+          `);
+        }
+      } else {
+        next();
+      }
     });
 
     // API route to serve analysis data
