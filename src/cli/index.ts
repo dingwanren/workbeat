@@ -39,7 +39,7 @@ program
         console.log('数据分析完成，正在导出数据...');
 
         // 导出分析结果为JSON文件 (use a standard name for the web API)
-        const dataFilePath = path.join(__dirname, '../../analysis-data.json');
+        const dataFilePath = path.join(process.cwd(), 'analysis-data.json');
         const exporter = new DataExporter(repoPath, metrics, commits);
         await exporter.exportToFile(dataFilePath);
 
@@ -50,7 +50,7 @@ program
         // 启动Express服务器
         const server = new WebServer({
           port: parseInt(options.port || '3000'),
-          dataFile: dataFilePath
+          dataFile: dataFilePath  // dataFilePath 已经是基于当前工作目录的完整路径
         });
 
         // Start the server and then open the browser

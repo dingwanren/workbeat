@@ -44,13 +44,15 @@ export class WebServer {
   private options: Required<ServerOptions>;
 
   constructor(options: ServerOptions) {
-    // 确定项目根目录
-    const projectRoot = findProjectRoot(process.cwd());
+    // 确保静态文件路径基于包安装目录，数据文件路径基于当前工作目录
+    const packageStaticDir = path.resolve(__dirname, '..', 'dist', 'static');
+    const currentWorkingDir = process.cwd();
 
     this.options = {
       port: options.port || 3000,
-      staticDir: options.staticDir || path.resolve(projectRoot, 'dist', 'static'),
-      dataFile: options.dataFile || path.resolve(projectRoot, 'analysis-data.json'),
+      staticDir: options.staticDir ||
+        (existsSync(packageStaticDir) ? packageStaticDir : path.resolve(currentWorkingDir, 'dist', 'static')),
+      dataFile: options.dataFile || path.resolve(currentWorkingDir, 'analysis-data.json'),
     };
 
     // 静态文件调试信息
