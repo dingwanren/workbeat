@@ -51,7 +51,7 @@ export default {
         trigger: 'axis',
         formatter: (params) => {
           const param = params[0]
-          return `时间: ${param.value[0]}点<br/>提交数: ${param.value[1]}`
+          return `时间: ${param.name}点<br/>提交数: ${param.value}`
         }
       },
       grid: {

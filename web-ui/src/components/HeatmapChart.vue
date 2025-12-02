@@ -26,7 +26,7 @@ export default {
     const computeHeatmapData = () => {
       // 只统计有提交的时间点，创建一个计数映射
       const timeCount = {}
-      console.log('热力图数据处理开始，提交总数：', props.data.commits.length)
+      // console.log('热力图数据处理开始，提交总数：', props.data.commits.length)
 
       props.data.commits.forEach((commit, index) => {
         const date = new Date(commit.timestamp)
@@ -35,13 +35,13 @@ export default {
         const adjustedDay = dayOfWeek === 0 ? 6 : dayOfWeek - 1
         const hour = date.getHours()
 
-        console.log(`提交 #${index + 1}:`, {
-          timestamp: commit.timestamp,
-          date: date.toString(),
-          dayOfWeek: dayOfWeek,
-          adjustedDay: adjustedDay,
-          hour: hour
-        })
+        // console.log(`提交 #${index + 1}:`, {
+        //   timestamp: commit.timestamp,
+        //   date: date.toString(),
+        //   dayOfWeek: dayOfWeek,
+        //   adjustedDay: adjustedDay,
+        //   hour: hour
+        // })
 
         // 创建时间键，格式为 "hour-day"，对应 [x, y]
         const timeKey = `${hour}-${adjustedDay}`
