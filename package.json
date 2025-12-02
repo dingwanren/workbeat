@@ -1,6 +1,6 @@
 {
   "name": "git-rhythm-analyzer",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Analyze Git repository work rhythm",
   "main": "dist/index.js",
   "bin": {
