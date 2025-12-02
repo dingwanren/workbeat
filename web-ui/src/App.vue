@@ -60,6 +60,12 @@
           <h2>提交习惯分析</h2>
           <CommitScatterPlot :data="data" />
         </section>
+
+        <!-- 工作时段热力图 -->
+        <section class="heatmap-section">
+          <h2>工作时段热力图</h2>
+          <HeatmapChart :data="data" />
+        </section>
       </div>
       
       <div v-else class="no-data">
@@ -75,6 +81,7 @@ import TeamAnalysis from './components/TeamAnalysis.vue'
 import WorkTimeChart from './components/WorkTimeChart.vue'
 import CodeTrendChart from './components/CodeTrendChart.vue'
 import CommitScatterPlot from './components/CommitScatterPlot.vue'
+import HeatmapChart from './components/HeatmapChart.vue'
 import { loadData } from './utils/data-loader.js'
 
 export default {
@@ -83,7 +90,8 @@ export default {
     TeamAnalysis,
     WorkTimeChart,
     CodeTrendChart,
-    CommitScatterPlot
+    CommitScatterPlot,
+    HeatmapChart
   },
   setup() {
     const data = ref(null)

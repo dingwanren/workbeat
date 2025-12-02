@@ -2,7 +2,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer, SVGRenderer } from 'echarts/renderers'
-import { BarChart, LineChart, ScatterChart, PieChart } from 'echarts/charts'
+import { BarChart, LineChart, ScatterChart, PieChart, HeatmapChart } from 'echarts/charts'
 import {
   GridComponent,
   TooltipComponent,
@@ -20,6 +20,7 @@ use([
   LineChart,       // 折线图
   ScatterChart,    // 散点图
   PieChart,        // 饼图
+  HeatmapChart,    // 热力图
   GridComponent,      // 网格组件
   TooltipComponent,   // 提示框组件
   LegendComponent,    // 图例组件
