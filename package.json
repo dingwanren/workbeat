@@ -16,7 +16,7 @@
     "install-web": "cd web-ui && pnpm install",
     "install:all": "pnpm install && cd web-ui && pnpm install",
     "dev-vue": "cd web-ui && pnpm run dev",
-    "build-vue": "cd web-ui && pnpm run build"
+    "build-vue": "cd web-ui && pnpm run build:prod"
   },
   "keywords": [
     "git",
