@@ -56,7 +56,7 @@ export default {
         sortedDates.forEach(date => {
           timeSeriesDates.push(date)
           timeSeriesInsertions.push(commitsByDate[date].insertions)
-          timeSeriesDeletions.push(Math.abs(commitsByDate[date].deletions)) // 使用绝对值表示删除
+          timeSeriesDeletions.push(-1 * Math.abs(commitsByDate[date].deletions)) // 使用绝对值表示删除
         })
         
         // 如果数据量合适，使用新计算的数据
@@ -103,7 +103,7 @@ export default {
               {
                 name: '新增行',
                 type: 'line',
-                stack: 'code',
+                // stack: 'code',
                 areaStyle: {},
                 emphasis: {
                   focus: 'series'
@@ -116,7 +116,7 @@ export default {
               {
                 name: '删除行',
                 type: 'line',
-                stack: 'code',
+                // stack: 'code',
                 areaStyle: {},
                 emphasis: {
                   focus: 'series'
