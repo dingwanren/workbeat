@@ -13,25 +13,25 @@
         <p>加载数据时出现错误: {{ error }}</p>
       </div>
       
-      <div v-else-if="data" class="dashboard">
+      <div v-else-if="analysisData" class="dashboard">
         <!-- 汇总信息 -->
         <section class="summary-section">
           <h2>分析摘要</h2>
           <div class="summary-cards">
             <div class="card">
-              <h3>{{ data.summary.totalCommits }}</h3>
+              <h3>{{ analysisData.summary.totalCommits }}</h3>
               <p>总提交数</p>
             </div>
             <div class="card">
-              <h3>{{ data.summary.totalAuthors }}</h3>
+              <h3>{{ analysisData.summary.totalAuthors }}</h3>
               <p>贡献者数量</p>
             </div>
             <div class="card">
-              <h3>{{ data.summary.totalInsertions }}</h3>
+              <h3>{{ analysisData.summary.totalInsertions }}</h3>
               <p>总新增行数</p>
             </div>
             <div class="card">
-              <h3>{{ data.summary.totalDeletions }}</h3>
+              <h3>{{ analysisData.summary.totalDeletions }}</h3>
               <p>总删除行数</p>
             </div>
           </div>
@@ -40,31 +40,31 @@
         <!-- 团队成员分析 -->
         <section class="team-analysis-section">
           <h2>团队成员分析</h2>
-          <TeamAnalysis :data="data" />
+          <TeamAnalysis :data="analysisData" />
         </section>
         
         <!-- 工作时段热力图 -->
         <section class="heatmap-section">
           <h2>工作时段热力图</h2>
-          <HeatmapChart :data="data" />
+          <HeatmapChart :data="analysisData" />
         </section>
 
         <!-- 提交趋势图 -->
         <section class="commit-trend-section">
           <h2>提交趋势图</h2>
-          <CommitTrendChart :data="data" />
+          <CommitTrendChart :data="analysisData" />
         </section>
         
         <!-- 代码产出趋势 -->
         <section class="code-trend-section">
           <h2>代码产出趋势</h2>
-          <CodeChangeTrendChart :data="data" />
+          <CodeChangeTrendChart :data="analysisData" />
         </section>
         
         <!-- 提交习惯分析 -->
         <!-- <section class="commit-scatter-section">
           <h2>提交习惯分析</h2>
-          <CommitScatterPlot :data="data" />
+          <CommitScatterPlot :data="analysisData" />
         </section> -->
       </div>
       
@@ -98,24 +98,43 @@ export default {
     CodeChangeTrendChart
   },
   setup() {
-    const data = ref(null)
+    const analysisData = ref(null)
     const loading = ref(true)
     const error = ref(null)
-    
-    onMounted(async () => {
-      try {
-        data.value = await loadData()
-        console.log('数据', data.value)
-      } catch (err) {
-        error.value = err.message
-        console.error('加载数据失败:', err)
-      } finally {
-        loading.value = false
-      }
-    })
+
+    console.log('🔄 Vue 应用启动...');
+    console.log('检查 window.__GIT_ANALYSIS_DATA__:', !!window.__GIT_ANALYSIS_DATA__);
+
+    // 优先使用嵌入式数据
+    if (window.__GIT_ANALYSIS_DATA__) {
+      console.log('📦 使用嵌入式数据');
+      console.log('✅ 嵌入式数据可用');
+      console.log('数据内容:', {
+        commits: window.__GIT_ANALYSIS_DATA__?.commits?.length || 0,
+        authors: window.__GIT_ANALYSIS_DATA__?.authorMetrics?.length || 0,
+        hasData: !!window.__GIT_ANALYSIS_DATA__
+      });
+      analysisData.value = window.__GIT_ANALYSIS_DATA__;
+      loading.value = false;
+    } else {
+      console.log('❌ 嵌入式数据不可用，将尝试 API 请求');
+
+      // 后备方案：调用 API
+      loading.value = true;
+      fetch('/api/analysis-data')
+        .then(res => res.json())
+        .then(data => {
+          analysisData.value = data;
+          loading.value = false;
+        })
+        .catch(error => {
+          console.error('加载数据失败:', error);
+          loading.value = false;
+        });
+    }
     
     return {
-      data,
+      analysisData,
       loading,
       error
     }

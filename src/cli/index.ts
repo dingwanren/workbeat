@@ -3,22 +3,18 @@ import { analyzeRepository } from '../core/analyzer.js';
 import { AuthorMetrics } from '../types/metrics.js';
 import { GitReader } from '../core/git-reader.js';
 import { CommitData } from '../types/commit.js';
-import { DataExporter } from '../visualizer/data-exporter.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import open from 'open';
-import { WebServer } from '../server/index.js';
-
-// 获取当前文件的目录路径
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { WebServer, ServerOptions } from '../server/index.js';
 
 /**
  * 统一的 Git 数据获取逻辑
  */
-async function analyzeRepositoryData(repoPath: string, logCallback?: (message: string) => void): Promise<{ commits: CommitData[], metrics: AuthorMetrics[] }> {
+async function analyzeRepositoryData(
+  repoPath: string, 
+  logCallback?: (message: string) => void
+): Promise<{ commits: CommitData[], metrics: AuthorMetrics[] }> {
+  
   logCallback?.('🚀 开始分析仓库...');
-
   const gitReader = new GitReader(repoPath);
 
   logCallback?.('📖 正在读取 Git 提交历史...');
@@ -33,81 +29,93 @@ async function analyzeRepositoryData(repoPath: string, logCallback?: (message: s
 }
 
 /**
- * 控制台输出模式
+ * 控制台输出模式 - 优化为简洁输出
  */
-async function consoleOutputMode(repoPath: string, commits: CommitData[], metrics: AuthorMetrics[], quiet: boolean = false) {
-  if (!quiet) {
-    console.log('\n🏆 仓库分析结果:');
-    console.log('===============================');
-  }
-
+function consoleOutputMode(commits: CommitData[], metrics: AuthorMetrics[]) {
+  console.log('\n📊 分析结果摘要:');
+  console.log('='.repeat(40));
+  
   // 核心统计数据
-  console.log(`\n📈 核心统计:`);
-  console.log(`  提交总数: ${commits.length}`);
-  console.log(`  作者总数: ${metrics.length}`);
-  console.log(`  文件变更总数: ${commits.reduce((sum, commit) => sum + commit.fileChanges.length, 0)}`);
-
-  // 作者排行榜
-  if (metrics.length > 0) {
-    console.log(`\n👥 作者贡献排行榜:`);
-    const sortedMetrics = [...metrics].sort((a, b) => b.commitCount - a.commitCount);
-
-    sortedMetrics.slice(0, 5).forEach((metric, index) => {
-      console.log(`  ${index + 1}. ${metric.author.name} (${metric.commitCount} 次提交, +${metric.totalInsertions}/-${Math.abs(metric.totalDeletions)} 行)`);
-    });
-
-    if (metrics.length > 5) {
-      console.log(`  ... 还有 ${metrics.length - 5} 位作者`);
-    }
-  }
-
-  // 最近提交摘要
+  console.log(`📈 提交总数: ${commits.length}`);
+  console.log(`👥 作者总数: ${metrics.length}`);
+  
+  const totalChanges = commits.reduce((sum, commit) => 
+    sum + (commit.totalInsertions || 0) + (commit.totalDeletions || 0), 0);
+  console.log(`✏️  代码变更: ${totalChanges.toLocaleString()} 行`);
+  
+  // 时间范围
   if (commits.length > 0) {
-    console.log(`\n🆕 最近提交摘要:`);
-    const recentCommits = commits.slice(-5).reverse(); // 最近5条，倒序显示（最新在前）
-
-    recentCommits.forEach(commit => {
-      const shortHash = commit.hash.substring(0, 8);
-      const commitDate = new Date(commit.timestamp).toLocaleDateString('zh-CN');
-      console.log(`  ${shortHash} - ${commit.author.name}: ${commit.message.substring(0, 50)}${commit.message.length > 50 ? '...' : ''} (${commitDate})`);
+    const firstCommit = new Date(commits[commits.length - 1].timestamp);
+    const lastCommit = new Date(commits[0].timestamp);
+    console.log(`📅 时间范围: ${firstCommit.toLocaleDateString('zh-CN')} - ${lastCommit.toLocaleDateString('zh-CN')}`);
+  }
+  
+  // 顶部作者
+  if (metrics.length > 0) {
+    console.log('\n🏆 贡献前三:');
+    const topAuthors = [...metrics]
+      .sort((a, b) => b.commitCount - a.commitCount)
+      .slice(0, 3);
+    
+    topAuthors.forEach((metric, index) => {
+      const netChanges = metric.totalInsertions - metric.totalDeletions;
+      const changeSign = netChanges >= 0 ? '+' : '';
+      console.log(`  ${index + 1}. ${metric.author.name}: ${metric.commitCount} 次提交, ${changeSign}${netChanges.toLocaleString()} 行`);
     });
   }
-
-  if (!quiet) {
-    console.log('\n✨ 分析完成!');
-  }
+  
+  console.log('\n✨ 分析完成! 使用 --serve 启动可视化界面');
 }
 
 /**
- * Web 可视化模式
+ * Web 可视化模式 - 改为嵌入式数据方案
  */
-async function webVisualizationMode(repoPath: string, commits: CommitData[], metrics: AuthorMetrics[], port: number, outputPath: string) {
-  console.log('🌐 启动 Web 可视化服务...');
-  console.log('📖 正在导出分析数据...');
-
-  const dataFilePath = path.join(process.cwd(), outputPath);
-  const exporter = new DataExporter(repoPath, metrics, commits);
-  await exporter.exportToFile(dataFilePath);
-
-  console.log('✅ 数据导出完成');
-  console.log(`🌐 启动服务器 (端口: ${port})...`);
-
-  const server = new WebServer({
+async function webVisualizationMode(
+  repoPath: string, 
+  commits: CommitData[], 
+  metrics: AuthorMetrics[], 
+  port: number
+) {
+  console.log('🌐 准备启动可视化服务...');
+  
+  // 构建分析结果对象
+  const analysisResult = {
+    repositoryPath: repoPath,
+    analysisDate: new Date().toISOString(),
+    authorMetrics: metrics,
+    commits: commits,
+    summary: {
+      totalCommits: commits.length,
+      totalAuthors: metrics.length,
+      totalInsertions: commits.reduce((sum, commit) => sum + (commit.totalInsertions || 0), 0),
+      totalDeletions: commits.reduce((sum, commit) => sum + (commit.totalDeletions || 0), 0),
+      timeRange: commits.length > 0 ? {
+        start: commits[commits.length - 1].timestamp,
+        end: commits[0].timestamp
+      } : { start: null, end: null }
+    }
+  };
+  
+  console.log('✅ 数据准备完成');
+  
+  const serverOptions: ServerOptions = {
     port: port,
-    dataFile: dataFilePath
-  });
-
-  await server.start();
-
-  const url = `http://localhost:${port}`;
-  console.log(`🌐 服务器启动成功: ${url}`);
-  console.log('📖 打开浏览器...');
-
+    analysisData: analysisResult
+  };
+  
+  const server = new WebServer(serverOptions);
+  
   try {
+    await server.start();
+    
+    const url = `http://localhost:${port}`;
+    console.log(`🌐 服务器已启动: ${url}`);
+    console.log('📖 正在打开浏览器...');
+    
     await open(url);
-    console.log('✅ 浏览器已自动打开');
-  } catch (err) {
-    console.log(`⚠️  自动打开浏览器失败，请手动访问: ${url}`);
+  } catch (error) {
+    console.error('❌ 启动服务失败:', error instanceof Error ? error.message : String(error));
+    process.exit(1);
   }
 }
 
@@ -116,26 +124,29 @@ const program = new Command();
 program
   .name('git-rhythm-analyzer')
   .description('分析Git仓库工作节奏')
-  .version('1.1.0')
+  .version('1.2.0')
   .argument('<repo-path>', '仓库路径')
   .option('-s, --serve', '启动Web可视化服务')
   .option('-p, --port <number>', 'Web服务端口', '3000')
-  .option('-o, --output <path>', '输出JSON文件路径', 'analysis-data.json')
-  .option('-q, --quiet', '安静模式，减少控制台输出')
-  .action(async (repoPath: string, options: { serve?: boolean; port?: string; output?: string; quiet?: boolean }) => {
+  .option('-q, --quiet', '安静模式，仅输出必要信息')
+  .action(async (repoPath: string, options: { 
+    serve?: boolean; 
+    port?: string; 
+    quiet?: boolean; 
+  }) => {
     try {
-      // 获取数据（统一逻辑）
+      // 获取数据
       const logCallback = options.quiet ? undefined : console.log;
       const { commits, metrics } = await analyzeRepositoryData(repoPath, logCallback);
-
+      
       // 根据模式选择输出方式
       if (options.serve) {
-        await webVisualizationMode(repoPath, commits, metrics, parseInt(options.port || '3000'), options.output || 'analysis-data.json');
+        await webVisualizationMode(repoPath, commits, metrics, parseInt(options.port || '3000'));
       } else {
-        await consoleOutputMode(repoPath, commits, metrics, options.quiet);
+        consoleOutputMode(commits, metrics);
       }
     } catch (error) {
-      console.error('❌ 分析仓库时发生错误:', error);
+      console.error('❌ 分析失败:', error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   });

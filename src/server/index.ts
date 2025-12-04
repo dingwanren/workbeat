@@ -1,195 +1,227 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, Application } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fs from 'fs/promises';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 
-// Get the current file's directory (equivalent to __dirname in CommonJS)
+// 获取当前文件目录
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Define the Express server type
-interface ServerOptions {
+// 服务器选项接口
+export interface ServerOptions {
   port: number;
   staticDir?: string;
-  dataFile?: string;
+  analysisData?: any; // 嵌入式数据
 }
 
-// Define the internal server options to ensure required fields are present
+// 默认服务器选项
 interface InternalServerOptions {
   port: number;
   staticDir: string;
-  dataFile: string;
-}
-
-// 辅助函数：找到项目根目录
-function findProjectRoot(currentDir: string): string {
-  let dir = currentDir;
-  const rootMarkerFiles = ['package.json', 'pnpm-lock.yaml', 'yarn.lock', 'package-lock.json'];
-
-  // 向上查找直到找到项目根目录标记文件或到达系统根目录
-  while (path.dirname(dir) !== dir) { // 不是系统根目录
-    if (rootMarkerFiles.some(marker => existsSync(path.join(dir, marker)))) {
-      return dir;
-    }
-    dir = path.dirname(dir);
-  }
-
-  // 如果没找到标记文件，返回当前目录作为根目录
-  return currentDir;
+  analysisData: any;
 }
 
 export class WebServer {
-  private app: express.Application;
-  private options: Required<ServerOptions>;
+  private app: Application;
+  private options: InternalServerOptions;
 
   constructor(options: ServerOptions) {
-    // 确保静态文件路径基于包安装目录，数据文件路径基于当前工作目录
+    // 确定静态文件目录（优先使用包内静态文件，其次使用当前工作目录）
     const packageStaticDir = path.resolve(__dirname, '..', 'static');
-    const currentWorkingDir = process.cwd();
-
+    const staticDir = options.staticDir || 
+      (existsSync(packageStaticDir) ? packageStaticDir : path.resolve(process.cwd(), 'dist', 'static'));
+    
+    // 验证静态文件目录
+    if (!existsSync(staticDir)) {
+      console.error(`❌ 静态文件目录不存在: ${staticDir}`);
+      console.log('💡 请确保已构建前端项目: pnpm run build');
+      throw new Error(`静态文件目录不存在: ${staticDir}`);
+    }
+    
     this.options = {
       port: options.port || 3000,
-      staticDir: options.staticDir || packageStaticDir,
-        // (existsSync(packageStaticDir) ? packageStaticDir : path.resolve(currentWorkingDir, 'dist', 'static')),
-      dataFile: options.dataFile || path.resolve(currentWorkingDir, 'analysis-data.json'),
+      staticDir: staticDir,
+      analysisData: options.analysisData || null
     };
-
-    // 静态文件调试信息
-    console.log('🔍 调试信息:');
-    console.log('当前工作目录:', process.cwd());
-    console.log('packageStaticDir:', packageStaticDir);
-    console.log('项目根目录:', findProjectRoot(process.cwd()));
-    console.log('静态文件绝对路径:', this.options.staticDir);
-    console.log('数据文件绝对路径:', this.options.dataFile);
-    console.log('静态文件路径是否存在:', existsSync(this.options.staticDir));
-    console.log('数据文件路径是否存在:', existsSync(this.options.dataFile));
-
+    
+    // 初始化 Express 应用
+    this.app = express();
+    
+    this.initializeServer();
+    this.setupRoutesAndMiddleware();
+  }
+  
+  private initializeServer(): void {
+    // 调试信息
+    console.log('🔧 服务器配置:');
+    console.log(`   端口: ${this.options.port}`);
+    console.log(`   静态文件目录: ${this.options.staticDir}`);
+    console.log(`   嵌入式数据: ${this.options.analysisData ? '已加载' : '无'}`);
+    
+    if (this.options.analysisData) {
+      console.log(`   提交数量: ${this.options.analysisData?.commits?.length || 0}`);
+      console.log(`   作者数量: ${this.options.analysisData?.authorMetrics?.length || 0}`);
+    }
+    
     if (existsSync(this.options.staticDir)) {
       const files = readdirSync(this.options.staticDir);
-      console.log('静态目录内容:', files);
-    } else {
-      console.log('❌ 静态文件目录不存在！');
+      console.log(`   静态文件数量: ${files.length}`);
     }
-
-    if (!existsSync(this.options.dataFile)) {
-      console.log('⚠️ 数据文件不存在:', this.options.dataFile);
-    }
-
-    this.app = express();
-
-    // Middleware to parse JSON
-    this.app.use(express.json());
-
-    // Enable CORS for all routes
-    this.app.use((req, res, next) => {
-      res.header('Access-Control-Allow-Origin', '*');
-      res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-      next();
-    });
-
-    // 静态文件请求日志
-    this.app.use('/assets', express.static(path.join(this.options.staticDir, 'assets'), {
-      etag: false,
-      lastModified: false,
-      setHeaders: (res, path, stat) => {
-        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.set('Pragma', 'no-cache');
-        res.set('Expires', '0');
-      }
-    }));
-    this.app.use(express.static(this.options.staticDir, {
-      etag: false,
-      lastModified: false,
-      setHeaders: (res, path, stat) => {
-        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.set('Pragma', 'no-cache');
-        res.set('Expires', '0');
-      }
-    }));
-
-    // 路由调试中间件
-    this.app.use((req, res, next) => {
-      console.log(`📨 请求: ${req.method} ${req.url}`);
-      if (req.url.includes('.js') || req.url.includes('.css')) {
-        const filePath = path.join(this.options.staticDir, req.url);
-        console.log(`📄 请求文件: ${filePath}`);
-        console.log(`📄 文件存在: ${existsSync(filePath)}`);
-      }
-      next();
-    });
-
-    // 静态文件目录不存在时的错误处理中间件
-    this.app.use((req, res, next) => {
-      if (!existsSync(this.options.staticDir)) {
-        console.error('❌ 静态文件目录不存在:', this.options.staticDir);
-        if (req.url.startsWith('/api/')) {
-          // API 请求继续处理
-          next();
-        } else {
-          // 静态文件请求返回错误
-          res.status(500).send(`
-            <h1>错误: 静态文件目录不存在</h1>
-            <p>请确保已构建前端项目 (run build command)</p>
-            <p>期望位置: ${this.options.staticDir}</p>
-            <p>当前工作目录: ${process.cwd()}</p>
-            <p>项目根目录: ${findProjectRoot(process.cwd())}</p>
-          `);
-        }
-      } else {
-        next();
-      }
-    });
-
-    // API route to serve analysis data
-    this.app.get('/api/analysis-data', async (req: Request, res: Response) => {
-      try {
-        const data = await fs.readFile(this.options.dataFile, 'utf8');
-        res.json(JSON.parse(data));
-      } catch (error) {
-        console.error('Error reading analysis data:', error);
-        res.status(500).json({ error: 'Failed to load analysis data' });
-      }
-    });
-
-    // 根路由返回正确的index.html
-    this.app.get('/', (req, res) => {
-      const indexPath = path.join(this.options.staticDir, 'index.html');
-      console.log('🏠 服务首页:', indexPath);
-      console.log('🏠 首页存在:', existsSync(indexPath));
-
-      if (existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.status(404).send('index.html not found');
-      }
-    });
-
-    // Catch-all route to serve the Vue app for client-side routing
-    this.app.get('*', (req: Request, res: Response) => {
-      const indexPath = path.join(this.options.staticDir, 'index.html');
-      console.log('🏠 服务首页:', indexPath);
-      console.log('🏠 首页存在:', existsSync(indexPath));
-
-      if (existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.status(404).send('index.html not found');
-      }
-    });
   }
-
-  public start(): Promise<void> {
-    return new Promise((resolve) => {
-      this.app.listen(this.options.port, () => {
-        console.log(`Server running at http://localhost:${this.options.port}`);
+  
+private setupRoutesAndMiddleware(): void {
+  console.log('🔄 设置路由和中间件...');
+  
+  // ==================== 第一步：设置请求日志中间件 ====================
+  this.app.use((req: Request, res: Response, next) => {
+    // 跳过静态文件的详细日志
+    const isStaticFile = req.url.match(/\.(js|css|png|jpg|svg|ico|woff|ttf)$/);
+    if (!isStaticFile) {
+      console.log(`📨 ${req.method} ${req.url}`);
+    }
+    next();
+  });
+  
+  // ==================== 第二步：设置 API 路由 ====================
+  this.app.get('/api/analysis-data', (req: Request, res: Response): void => {
+    console.log('📡 API 请求: /api/analysis-data');
+    if (this.options.analysisData) {
+      res.json(this.options.analysisData);
+    } else {
+      res.status(404).json({ error: '无可用数据' });
+    }
+  });
+  
+  // ==================== 第三步：设置根路由（注入数据） ====================
+  this.app.get('/', (req: Request, res: Response): void => {
+    console.log('🎯 处理根路由请求');
+    this.serveIndexWithData(res);
+  });
+  
+  // ==================== 第四步：设置静态文件中间件 ====================
+  const staticOptions = {
+    etag: false,
+    lastModified: false,
+    setHeaders: (res: Response) => {
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+    }
+  };
+  
+  // 静态文件服务（处理 /assets/ 等静态资源）
+  // 注意：这会在路由之后执行，所以不会拦截根路由
+  this.app.use(express.static(this.options.staticDir, staticOptions));
+  console.log('✅ 静态文件中间件已设置');
+  
+  // ==================== 第五步：设置智能客户端路由回退 ====================
+  this.app.get('*', (req: Request, res: Response, next): void => {
+    const url = req.path;
+    
+    // 跳过有扩展名的请求（这些应该由静态文件中间件处理）
+    if (url.match(/\.\w+$/)) {
+      console.log(`⏭️  跳过静态文件请求: ${url}`);
+      return next(); // 让静态文件中间件处理
+    }
+    
+    // 跳过 API 请求
+    if (url.startsWith('/api/')) {
+      return next();
+    }
+    
+    // 跳过已处理的路由
+    if (url === '/') {
+      return next();
+    }
+    
+    console.log(`🔄 处理客户端路由: ${url}`);
+    this.serveIndexWithData(res);
+  });
+  
+  console.log('✅ 路由和中间件设置完成');
+}
+  
+  /**
+   * 辅助方法：注入数据并返回 index.html
+   */
+  private serveIndexWithData(res: Response): void {
+    const indexPath = path.join(this.options.staticDir, 'index.html');
+    
+    if (!existsSync(indexPath)) {
+      console.error('❌ index.html 不存在');
+      res.status(404).send('index.html not found');
+      return;
+    }
+    
+    try {
+      // 读取 HTML 文件
+      let html = readFileSync(indexPath, 'utf-8');
+      
+      // 检查是否已有数据注入
+      const hasInjectedData = html.includes('__GIT_ANALYSIS_DATA__');
+      
+      // 注入嵌入式数据
+      if (this.options.analysisData && !hasInjectedData) {
+        console.log('💉 注入嵌入式数据到 index.html');
+        
+        const injectedScript = `
+          <script>
+            // Git 仓库分析数据 - 嵌入式注入
+            window.__GIT_ANALYSIS_DATA__ = ${JSON.stringify(this.options.analysisData)};
+            console.log('✅ 嵌入式数据已加载', {
+              commits: window.__GIT_ANALYSIS_DATA__?.commits?.length || 0,
+              authors: window.__GIT_ANALYSIS_DATA__?.authorMetrics?.length || 0,
+              analysisDate: window.__GIT_ANALYSIS_DATA__?.analysisDate || '未知'
+            });
+          </script>
+        `;
+        
+        // 尝试在 </head> 前注入
+        if (html.includes('</head>')) {
+          html = html.replace('</head>', `${injectedScript}</head>`);
+        } 
+        // 备用方案：在 <body> 前注入
+        else if (html.includes('<body')) {
+          html = html.replace('<body', `${injectedScript}<body`);
+        }
+        // 最后方案：在文件末尾注入
+        else {
+          html = html + injectedScript;
+        }
+        
+        console.log('✅ 数据注入成功');
+      } else if (hasInjectedData) {
+        console.log('ℹ️  index.html 已包含嵌入式数据');
+      } else {
+        console.log('⚠️  无分析数据可注入');
+      }
+      
+      // 发送响应
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+      
+    } catch (error) {
+      console.error('❌ 处理 index.html 失败:', error);
+      res.status(500).send('服务器内部错误');
+    }
+  }
+  
+  public async start(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const server = this.app.listen(this.options.port, () => {
+        console.log(`\n✅ 服务器启动成功: http://localhost:${this.options.port}`);
+        console.log('💡 按 Ctrl+C 停止服务器\n');
         resolve();
+      });
+      
+      server.on('error', (error) => {
+        console.error('❌ 服务器启动失败:', error);
+        reject(error);
       });
     });
   }
-
-  public getExpressApp(): express.Application {
+  
+  public getExpressApp(): Application {
     return this.app;
   }
 }

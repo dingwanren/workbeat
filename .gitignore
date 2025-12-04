@@ -1,7 +1,5 @@
 node_modules/
 dist/
-analysis-data.json
-analysis-result.json
 *.log
 .DS_Store
 .env
