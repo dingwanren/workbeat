@@ -101,6 +101,7 @@ export default {
     onMounted(async () => {
       try {
         data.value = await loadData()
+        console.log('数据', data.value)
       } catch (err) {
         error.value = err.message
         console.error('加载数据失败:', err)

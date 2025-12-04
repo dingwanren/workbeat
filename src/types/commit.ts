@@ -3,7 +3,15 @@
  */
 
 /**
- * Git原始日志格式类型定义
+ * 作者信息
+ */
+export interface AuthorInfo {
+  name: string;
+  email: string;
+}
+
+/**
+ * Git原始日志格式类型定义（用于解析中间层）
  */
 export interface RawCommitLog {
   hash: string;
@@ -20,39 +28,33 @@ export interface FileChange {
   filename: string;
   insertions: number;
   deletions: number;
+  language?: string;
+  status?: 'added' | 'modified' | 'deleted' | 'renamed';
 }
 
 /**
- * 统一格式的提交数据结构
+ * 完整的提交数据
  */
 export interface CommitData {
   hash: string;
-  author: {
-    name: string;
-    email: string;
-  };
+  author: AuthorInfo;
   timestamp: Date;
   message: string;
-  insertions: number;
-  deletions: number;
+  parentHashes: string[];
+  fileChanges: FileChange[];
+  totalInsertions: number;
+  totalDeletions: number;
   filesChanged: number;
-  fileDetails?: FileChange[];
+  tags?: string[];
+  branchNames?: string[];
 }
 
+
 /**
- * 仓库分析结果类型定义
+ * Git读取器配置选项
  */
-export interface RepositoryAnalysisResult {
-  repositoryPath: string;
-  totalCommits: number;
-  commits: CommitData[];
-  authors: Array<{
-    name: string;
-    email: string;
-    commitCount: number;
-  }>;
-  timeRange: {
-    start: Date;
-    end: Date;
-  };
+export interface GitReaderOptions {
+  includeAllBranches?: boolean;
+  parseFileDetails?: boolean;
+  maxConcurrentRequests?: number;
 }

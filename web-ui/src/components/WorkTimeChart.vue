@@ -27,7 +27,7 @@ export default {
       const hourlyCount = new Array(24).fill(0)
       
       props.data.commits.forEach(commit => {
-        const hour = new Date(commit.timestamp).getUTCHours()
+        const hour = new Date(commit.timestamp).getHours() // 多时区成员的怎么办
         hourlyCount[hour]++
       })
       

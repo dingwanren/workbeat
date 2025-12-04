@@ -25,8 +25,8 @@ export function calculateBasicMetrics(commits: CommitData[]): AuthorMetrics[] {
     const commitCount = authorCommits.length;
 
     // 累计真实的增删行数 from the commits
-    const totalInsertions = authorCommits.reduce((sum, commit) => sum + (commit.insertions || 0), 0);
-    const totalDeletions = authorCommits.reduce((sum, commit) => sum + (commit.deletions || 0), 0);
+    const totalInsertions = authorCommits.reduce((sum, commit) => sum + commit.totalInsertions, 0);
+    const totalDeletions = authorCommits.reduce((sum, commit) => sum + commit.totalDeletions, 0);
 
     const netChanges = totalInsertions - totalDeletions;
     

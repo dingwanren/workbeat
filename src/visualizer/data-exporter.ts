@@ -40,9 +40,9 @@ export class DataExporter {
 
   /**
    * 导出分析结果为JSON文件
-   * @param outputPath 输出文件路径，默认为 analysis-result.json
+   * @param outputPath 输出文件路径，默认为 analysis-data.json
    */
-  async exportToFile(outputPath: string = 'analysis-result.json'): Promise<void> {
+  async exportToFile(outputPath: string = 'analysis-data.json'): Promise<void> {
     try {
       // 计算汇总数据
       const totalInsertions = this.metrics.reduce((sum, metric) => sum + metric.totalInsertions, 0);

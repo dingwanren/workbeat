@@ -119,7 +119,7 @@ function generateTrendData(commits: CommitData[], timeRange: { start: Date; end:
     commitTrends.push(monthCommits.length);
 
     // 统计该月的代码变更
-    const monthCodeChanges = monthCommits.reduce((sum, commit) => sum + (commit.insertions - commit.deletions), 0);
+    const monthCodeChanges = monthCommits.reduce((sum, commit) => sum + (commit.totalInsertions - commit.totalDeletions), 0);
     codeChangeTrends.push(monthCodeChanges);
 
     // 移动到下一个月
