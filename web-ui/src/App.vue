@@ -43,29 +43,29 @@
           <TeamAnalysis :data="data" />
         </section>
         
-        <!-- 工作时段分布 -->
-        <section class="work-time-section">
-          <h2>工作时段分布</h2>
-          <WorkTimeChart :data="data" />
-        </section>
-        
-        <!-- 代码产出趋势 -->
-        <section class="code-trend-section">
-          <h2>代码产出趋势</h2>
-          <CodeTrendChart :data="data" />
-        </section>
-        
-        <!-- 提交习惯分析 -->
-        <section class="commit-scatter-section">
-          <h2>提交习惯分析</h2>
-          <CommitScatterPlot :data="data" />
-        </section>
-
         <!-- 工作时段热力图 -->
         <section class="heatmap-section">
           <h2>工作时段热力图</h2>
           <HeatmapChart :data="data" />
         </section>
+
+        <!-- 提交趋势图 -->
+        <section class="commit-trend-section">
+          <h2>提交趋势图</h2>
+          <CommitTrendChart :data="data" />
+        </section>
+        
+        <!-- 代码产出趋势 -->
+        <section class="code-trend-section">
+          <h2>代码产出趋势</h2>
+          <CodeChangeTrendChart :data="data" />
+        </section>
+        
+        <!-- 提交习惯分析 -->
+        <!-- <section class="commit-scatter-section">
+          <h2>提交习惯分析</h2>
+          <CommitScatterPlot :data="data" />
+        </section> -->
       </div>
       
       <div v-else class="no-data">
@@ -82,6 +82,8 @@ import WorkTimeChart from './components/WorkTimeChart.vue'
 import CodeTrendChart from './components/CodeTrendChart.vue'
 import CommitScatterPlot from './components/CommitScatterPlot.vue'
 import HeatmapChart from './components/HeatmapChart.vue'
+import CommitTrendChart from './components/CommitTrendChart.vue'
+import CodeChangeTrendChart from './components/CodeChangeTrendChart.vue'
 import { loadData } from './utils/data-loader.js'
 
 export default {
@@ -91,7 +93,9 @@ export default {
     WorkTimeChart,
     CodeTrendChart,
     CommitScatterPlot,
-    HeatmapChart
+    HeatmapChart,
+    CommitTrendChart,
+    CodeChangeTrendChart
   },
   setup() {
     const data = ref(null)
