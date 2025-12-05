@@ -71,7 +71,7 @@ export class WebServer {
   
 private setupRoutesAndMiddleware(): void {
   console.log('🔄 设置路由和中间件...');
-  
+
   // ==================== 第一步：设置请求日志中间件 ====================
   this.app.use((req: Request, res: Response, next) => {
     // 跳过静态文件的详细日志
@@ -81,24 +81,14 @@ private setupRoutesAndMiddleware(): void {
     }
     next();
   });
-  
-  // ==================== 第二步：设置 API 路由 ====================
-  this.app.get('/api/analysis-data', (req: Request, res: Response): void => {
-    console.log('📡 API 请求: /api/analysis-data');
-    if (this.options.analysisData) {
-      res.json(this.options.analysisData);
-    } else {
-      res.status(404).json({ error: '无可用数据' });
-    }
-  });
-  
-  // ==================== 第三步：设置根路由（注入数据） ====================
+
+  // ==================== 第二步：设置根路由（注入数据） ====================
   this.app.get('/', (req: Request, res: Response): void => {
     console.log('🎯 处理根路由请求');
     this.serveIndexWithData(res);
   });
-  
-  // ==================== 第四步：设置静态文件中间件 ====================
+
+  // ==================== 第三步：设置静态文件中间件 ====================
   const staticOptions = {
     etag: false,
     lastModified: false,
@@ -108,36 +98,31 @@ private setupRoutesAndMiddleware(): void {
       res.set('Expires', '0');
     }
   };
-  
+
   // 静态文件服务（处理 /assets/ 等静态资源）
   // 注意：这会在路由之后执行，所以不会拦截根路由
   this.app.use(express.static(this.options.staticDir, staticOptions));
   console.log('✅ 静态文件中间件已设置');
-  
-  // ==================== 第五步：设置智能客户端路由回退 ====================
+
+  // ==================== 第四步：设置智能客户端路由回退 ====================
   this.app.get('*', (req: Request, res: Response, next): void => {
     const url = req.path;
-    
+
     // 跳过有扩展名的请求（这些应该由静态文件中间件处理）
     if (url.match(/\.\w+$/)) {
       console.log(`⏭️  跳过静态文件请求: ${url}`);
       return next(); // 让静态文件中间件处理
     }
-    
-    // 跳过 API 请求
-    if (url.startsWith('/api/')) {
-      return next();
-    }
-    
+
     // 跳过已处理的路由
     if (url === '/') {
       return next();
     }
-    
+
     console.log(`🔄 处理客户端路由: ${url}`);
     this.serveIndexWithData(res);
   });
-  
+
   console.log('✅ 路由和中间件设置完成');
 }
   
@@ -159,11 +144,11 @@ private setupRoutesAndMiddleware(): void {
       
       // 检查是否已有数据注入
       const hasInjectedData = html.includes('__GIT_ANALYSIS_DATA__');
-      
+
       // 注入嵌入式数据
       if (this.options.analysisData && !hasInjectedData) {
         console.log('💉 注入嵌入式数据到 index.html');
-        
+
         const injectedScript = `
           <script>
             // Git 仓库分析数据 - 嵌入式注入
@@ -175,11 +160,11 @@ private setupRoutesAndMiddleware(): void {
             });
           </script>
         `;
-        
+
         // 尝试在 </head> 前注入
         if (html.includes('</head>')) {
           html = html.replace('</head>', `${injectedScript}</head>`);
-        } 
+        }
         // 备用方案：在 <body> 前注入
         else if (html.includes('<body')) {
           html = html.replace('<body', `${injectedScript}<body`);
@@ -188,7 +173,7 @@ private setupRoutesAndMiddleware(): void {
         else {
           html = html + injectedScript;
         }
-        
+
         console.log('✅ 数据注入成功');
       } else if (hasInjectedData) {
         console.log('ℹ️  index.html 已包含嵌入式数据');

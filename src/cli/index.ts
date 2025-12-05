@@ -5,6 +5,7 @@ import { GitReader } from '../core/git-reader.js';
 import { CommitData } from '../types/commit.js';
 import open from 'open';
 import { WebServer, ServerOptions } from '../server/index.js';
+import { HtmlReportGenerator } from '../visualizer/html-report-generator.js';
 
 /**
  * 统一的 Git 数据获取逻辑
@@ -68,18 +69,18 @@ function consoleOutputMode(commits: CommitData[], metrics: AuthorMetrics[]) {
 }
 
 /**
- * Web 可视化模式 - 改为嵌入式数据方案
+ * 创建分析结果对象
+ * @param repoPath 仓库路径
+ * @param commits 提交数据
+ * @param metrics 指标数据
+ * @returns 分析结果对象
  */
-async function webVisualizationMode(
-  repoPath: string, 
-  commits: CommitData[], 
-  metrics: AuthorMetrics[], 
-  port: number
+function createAnalysisResult(
+  repoPath: string,
+  commits: CommitData[],
+  metrics: AuthorMetrics[]
 ) {
-  console.log('🌐 准备启动可视化服务...');
-  
-  // 构建分析结果对象
-  const analysisResult = {
+  return {
     repositoryPath: repoPath,
     analysisDate: new Date().toISOString(),
     authorMetrics: metrics,
@@ -95,23 +96,38 @@ async function webVisualizationMode(
       } : { start: null, end: null }
     }
   };
-  
+}
+
+/**
+ * Web 可视化模式 - 改为嵌入式数据方案
+ */
+async function webVisualizationMode(
+  repoPath: string,
+  commits: CommitData[],
+  metrics: AuthorMetrics[],
+  port: number
+) {
+  console.log('🌐 准备启动可视化服务...');
+
+  // 构建分析结果对象
+  const analysisResult = createAnalysisResult(repoPath, commits, metrics);
+
   console.log('✅ 数据准备完成');
-  
+
   const serverOptions: ServerOptions = {
     port: port,
     analysisData: analysisResult
   };
-  
+
   const server = new WebServer(serverOptions);
-  
+
   try {
     await server.start();
-    
+
     const url = `http://localhost:${port}`;
     console.log(`🌐 服务器已启动: ${url}`);
     console.log('📖 正在打开浏览器...');
-    
+
     await open(url);
   } catch (error) {
     console.error('❌ 启动服务失败:', error instanceof Error ? error.message : String(error));
@@ -129,18 +145,33 @@ program
   .option('-s, --serve', '启动Web可视化服务')
   .option('-p, --port <number>', 'Web服务端口', '3000')
   .option('-q, --quiet', '安静模式，仅输出必要信息')
-  .action(async (repoPath: string, options: { 
-    serve?: boolean; 
-    port?: string; 
-    quiet?: boolean; 
+  .option('-r, --report [path]', '导出HTML报告到指定路径，如果不指定则默认为当前目录下的workbeat-report.html')
+  .action(async (repoPath: string, options: {
+    serve?: boolean;
+    report?: string | boolean;
+    port?: string;
+    quiet?: boolean;
   }) => {
     try {
+      // 检查 --serve 和 --report 是否同时使用
+      if (options.serve && options.report !== undefined) {
+        console.error('❌ 错误: --serve 和 --report 选项不能同时使用');
+        process.exit(1);
+      }
+
       // 获取数据
       const logCallback = options.quiet ? undefined : console.log;
       const { commits, metrics } = await analyzeRepositoryData(repoPath, logCallback);
-      
-      // 根据模式选择输出方式
-      if (options.serve) {
+
+      // 根据选项决定输出方式
+      if (options.report !== undefined) {
+        // 导出HTML报告
+        const analysisResult = createAnalysisResult(repoPath, commits, metrics);
+        const generator = new HtmlReportGenerator();
+        const reportPath = typeof options.report === 'string' ? options.report : undefined;
+        const outputPath = await generator.generateReport(analysisResult, reportPath);
+        console.log(`📄 HTML报告已生成: ${outputPath}`);
+      } else if (options.serve) {
         await webVisualizationMode(repoPath, commits, metrics, parseInt(options.port || '3000'));
       } else {
         consoleOutputMode(commits, metrics);

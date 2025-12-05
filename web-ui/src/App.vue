@@ -60,16 +60,10 @@
           <h2>代码产出趋势</h2>
           <CodeChangeTrendChart :data="analysisData" />
         </section>
-        
-        <!-- 提交习惯分析 -->
-        <!-- <section class="commit-scatter-section">
-          <h2>提交习惯分析</h2>
-          <CommitScatterPlot :data="analysisData" />
-        </section> -->
       </div>
       
       <div v-else class="no-data">
-        <p>未找到分析数据，请确保 analysis-result.json 文件存在。</p>
+        <p>未找到分析数据，请确保数据已正确注入到页面中。</p>
       </div>
     </main>
   </div>
@@ -78,21 +72,20 @@
 <script>
 import { ref, onMounted } from 'vue'
 import TeamAnalysis from './components/TeamAnalysis.vue'
-import WorkTimeChart from './components/WorkTimeChart.vue'
+// import WorkTimeChart from './components/WorkTimeChart.vue'
 import CodeTrendChart from './components/CodeTrendChart.vue'
-import CommitScatterPlot from './components/CommitScatterPlot.vue'
+// import CommitScatterPlot from './components/CommitScatterPlot.vue'
 import HeatmapChart from './components/HeatmapChart.vue'
 import CommitTrendChart from './components/CommitTrendChart.vue'
 import CodeChangeTrendChart from './components/CodeChangeTrendChart.vue'
-import { loadData } from './utils/data-loader.js'
 
 export default {
   name: 'App',
   components: {
     TeamAnalysis,
-    WorkTimeChart,
+    // WorkTimeChart,
     CodeTrendChart,
-    CommitScatterPlot,
+    // CommitScatterPlot,
     HeatmapChart,
     CommitTrendChart,
     CodeChangeTrendChart
@@ -105,7 +98,7 @@ export default {
     console.log('🔄 Vue 应用启动...');
     console.log('检查 window.__GIT_ANALYSIS_DATA__:', !!window.__GIT_ANALYSIS_DATA__);
 
-    // 优先使用嵌入式数据
+    // 使用嵌入式数据 (now the only method)
     if (window.__GIT_ANALYSIS_DATA__) {
       console.log('📦 使用嵌入式数据');
       console.log('✅ 嵌入式数据可用');
@@ -117,20 +110,9 @@ export default {
       analysisData.value = window.__GIT_ANALYSIS_DATA__;
       loading.value = false;
     } else {
-      console.log('❌ 嵌入式数据不可用，将尝试 API 请求');
-
-      // 后备方案：调用 API
-      loading.value = true;
-      fetch('/api/analysis-data')
-        .then(res => res.json())
-        .then(data => {
-          analysisData.value = data;
-          loading.value = false;
-        })
-        .catch(error => {
-          console.error('加载数据失败:', error);
-          loading.value = false;
-        });
+      console.error('❌ 未找到嵌入式数据！请确保数据已正确注入到HTML中。');
+      error.value = '未找到分析数据，请确保数据已正确注入到HTML中。';
+      loading.value = false;
     }
     
     return {
