@@ -122,7 +122,7 @@ async function webVisualizationMode(
 const program = new Command();
 
 program
-  .name('git-rhythm-analyzer')
+  .name('workbeat')
   .description('分析Git仓库工作节奏')
   .version('1.2.0')
   .argument('<repo-path>', '仓库路径')
