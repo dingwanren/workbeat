@@ -71,6 +71,7 @@
 
 <script>
 import { ref, onMounted } from 'vue'
+import { expandFieldNames, isCompactFormat } from './utils/expandFieldNames.js'
 import TeamAnalysis from './components/TeamAnalysis.vue'
 // import WorkTimeChart from './components/WorkTimeChart.vue'
 import CodeTrendChart from './components/CodeTrendChart.vue'
@@ -103,18 +104,28 @@ export default {
       console.log('📦 使用嵌入式数据');
       console.log('✅ 嵌入式数据可用');
       console.log('数据内容:', {
-        commits: window.__GIT_ANALYSIS_DATA__?.commits?.length || 0,
-        authors: window.__GIT_ANALYSIS_DATA__?.authorMetrics?.length || 0,
+        commits: window.__GIT_ANALYSIS_DATA__?.commits?.length || window.__GIT_ANALYSIS_DATA__?.cs?.length || 0,
+        authors: window.__GIT_ANALYSIS_DATA__?.authorMetrics?.length || window.__GIT_ANALYSIS_DATA__?.am?.length || 0,
         hasData: !!window.__GIT_ANALYSIS_DATA__
       });
-      analysisData.value = window.__GIT_ANALYSIS_DATA__;
+
+      // 检查数据格式并进行转换
+      if (isCompactFormat(window.__GIT_ANALYSIS_DATA__)) {
+        console.log('🔄 检测到压缩数据格式，正在转换为原始格式...');
+        analysisData.value = expandFieldNames(window.__GIT_ANALYSIS_DATA__);
+        console.log('✅ 数据格式转换完成');
+      } else {
+        console.log('📦 使用原始数据格式');
+        analysisData.value = window.__GIT_ANALYSIS_DATA__;
+      }
+
       loading.value = false;
     } else {
       console.error('❌ 未找到嵌入式数据！请确保数据已正确注入到HTML中。');
       error.value = '未找到分析数据，请确保数据已正确注入到HTML中。';
       loading.value = false;
     }
-    
+
     return {
       analysisData,
       loading,

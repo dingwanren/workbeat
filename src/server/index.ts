@@ -2,6 +2,7 @@ import express, { Request, Response, Application } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, readdirSync, readFileSync } from 'fs';
+import { shortenFieldNames, compactParentHashesAndTimestamps } from '../utils/shortenFieldNames';
 
 // 获取当前文件目录
 const __filename = fileURLToPath(import.meta.url);
@@ -149,14 +150,18 @@ private setupRoutesAndMiddleware(): void {
       if (this.options.analysisData && !hasInjectedData) {
         console.log('💉 注入嵌入式数据到 index.html');
 
+        // 使用缩短的字段名并转换时间戳和哈希值
+        const compacted = this.shortenFieldNames(this.options.analysisData);
+        const finalData = this.compactParentHashesAndTimestamps(compacted);
+
         const injectedScript = `
           <script>
-            // Git 仓库分析数据 - 嵌入式注入
-            window.__GIT_ANALYSIS_DATA__ = ${JSON.stringify(this.options.analysisData)};
+            // Git 仓库分析数据 - 嵌入式注入 (已压缩字段名和数据)
+            window.__GIT_ANALYSIS_DATA__ = ${JSON.stringify(finalData)};
             console.log('✅ 嵌入式数据已加载', {
-              commits: window.__GIT_ANALYSIS_DATA__?.commits?.length || 0,
-              authors: window.__GIT_ANALYSIS_DATA__?.authorMetrics?.length || 0,
-              analysisDate: window.__GIT_ANALYSIS_DATA__?.analysisDate || '未知'
+              commits: window.__GIT_ANALYSIS_DATA__?.cs?.length || 0,
+              authors: window.__GIT_ANALYSIS_DATA__?.am?.length || 0,
+              analysisDate: window.__GIT_ANALYSIS_DATA__?.ad || '未知'
             });
           </script>
         `;
@@ -208,5 +213,19 @@ private setupRoutesAndMiddleware(): void {
   
   public getExpressApp(): Application {
     return this.app;
+  }
+
+  /**
+   * Helper method to shorten field names
+   */
+  private shortenFieldNames(data: any) {
+    return shortenFieldNames(data);
+  }
+
+  /**
+   * Helper method to compact parent hashes and timestamps
+   */
+  private compactParentHashesAndTimestamps(data: any) {
+    return compactParentHashesAndTimestamps(data);
   }
 }

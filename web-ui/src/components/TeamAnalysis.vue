@@ -34,8 +34,8 @@
       </table>
     </div>
     
-    <!-- 作者贡献图表 -->
-    <div class="charts">
+    <!-- 作者贡献图表 和上面表格重复了吧-->
+    <!-- <div class="charts">
       <div class="chart-item">
         <h3>提交数分布</h3>
         <v-chart class="chart" :option="commitCountChartOption" autoresize />
@@ -45,7 +45,7 @@
         <h3>代码变更统计</h3>
         <v-chart class="chart" :option="codeChangeChartOption" autoresize />
       </div>
-    </div>
+    </div> -->
   </div>
 </template>
 

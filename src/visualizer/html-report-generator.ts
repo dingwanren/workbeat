@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { shortenFieldNames, compactParentHashesAndTimestamps } from '../utils/shortenFieldNames';
 
 /**
  * HtmlReportGenerator类负责生成独立的HTML报告文件
@@ -50,13 +51,18 @@ export class HtmlReportGenerator {
    * @returns 更新后的HTML内容
    */
   private inlineData(htmlContent: string, analysisData: any): string {
+    // 使用缩短的字段名并转换时间戳和哈希值 (优化大数据量)
+    const compacted = shortenFieldNames(analysisData);
+    const finalData = compactParentHashesAndTimestamps(compacted);
+
     // 使用 JSON.stringify 并处理特殊字符以避免 XSS
-    const jsonString = JSON.stringify(analysisData, null, 2)
+    const jsonString = JSON.stringify(finalData, null, 2)
       .replace(/</g, '\\u003c')  // Prevent script tag injection
       .replace(/>/g, '\\u003e')  // Prevent script tag injection
       .replace(/&/g, '\\u0026'); // Prevent other injection issues
 
     const dataScript = `<script>
+      // Git 仓库分析数据 - 嵌入式注入 (已压缩字段名和数据)
       window.__GIT_ANALYSIS_DATA__ = ${jsonString};
     </script>`;
 

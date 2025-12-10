@@ -16,3 +16,5 @@ web-ui/node_modules/
 web-ui/dist/
 web-ui/.vite/
 web-ui/.nuxt/
+workbeat-report*.html
+todo*.md
