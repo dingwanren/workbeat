@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { shortenFieldNames, compactParentHashesAndTimestamps } from '../utils/shortenFieldNames';
+import { injectChunkedData } from '../utils/chunkData';
 
 /**
  * HtmlReportGenerator类负责生成独立的HTML报告文件
@@ -55,17 +56,8 @@ export class HtmlReportGenerator {
     const compacted = shortenFieldNames(analysisData);
     const finalData = compactParentHashesAndTimestamps(compacted);
 
-    // 使用紧凑的 JSON.stringify (无缩进和空格) 并处理特殊字符以避免 XSS
-    const jsonString = JSON.stringify(finalData)
-      .replace(/</g, '\\u003c')  // Prevent script tag injection
-      .replace(/>/g, '\\u003e')  // Prevent script tag injection
-      .replace(/&/g, '\\u0026'); // Prevent other injection issues
-
-    const dataScript = `<script>// Git 仓库分析数据 - 嵌入式注入 (已压缩字段名和数据)
-window.__GIT_ANALYSIS_DATA__ = ${jsonString};</script>`;
-
-    // 将数据注入到 <head> 标签中
-    return htmlContent.replace(/(<head>)/i, `$1\n    ${dataScript}`);
+    // 使用分块注入以处理大型数据集
+    return injectChunkedData(htmlContent, finalData, { maxChunkSize: 1024 * 1024 }); // 1MB/块
   }
 
   /**
@@ -103,7 +95,7 @@ window.__GIT_ANALYSIS_DATA__ = ${jsonString};</script>`;
     // 匹配 <script type="module" src="..."> 标签
     const scriptRegex = /<script[^>]*type=["']module["'][^>]*src=["']([^"']*(?:\.js))["'][^>]*><\/script>/gi;
 
-    let scriptTags: string[] = [];
+    const scriptTags: string[] = [];
     let match;
 
     while ((match = scriptRegex.exec(htmlContent)) !== null) {
@@ -112,11 +104,11 @@ window.__GIT_ANALYSIS_DATA__ = ${jsonString};</script>`;
 
       // 解析JS文件路径
       const absScriptPath = path.join(HtmlReportGenerator.DIST_STATIC_PATH, scriptPath);
-      let scriptContent = await fs.readFile(absScriptPath, 'utf-8');
+      const scriptContent = await fs.readFile(absScriptPath, 'utf-8');
 
       // For ES modules, we need to convert them to work in a non-module context
       // Replace dynamic imports and module-specific syntax that might cause circular references
-      let processedScriptContent = scriptContent
+      const processedScriptContent = scriptContent
         .replace(/import\.meta\.url/g, 'window.location.href')
         // Comment out import statements
         .replace(/\bimport\s+/g, '// import ')

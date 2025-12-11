@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { shortenFieldNames, compactParentHashesAndTimestamps } from '../utils/shortenFieldNames';
+import { injectChunkedData } from '../utils/chunkData';
 
 // 获取当前文件目录
 const __filename = fileURLToPath(import.meta.url);
@@ -154,26 +155,8 @@ private setupRoutesAndMiddleware(): void {
         const compacted = this.shortenFieldNames(this.options.analysisData);
         const finalData = this.compactParentHashesAndTimestamps(compacted);
 
-        const injectedScript = `
-          <script>
-            // Git 仓库分析数据 - 嵌入式注入 (已压缩字段名和数据)
-            window.__GIT_ANALYSIS_DATA__ = ${JSON.stringify(finalData)};
-            console.log('✅ 嵌入式数据已加载', {commits: window.__GIT_ANALYSIS_DATA__?.cs?.length || 0, authors: window.__GIT_ANALYSIS_DATA__?.am?.length || 0, analysisDate: window.__GIT_ANALYSIS_DATA__?.ad || '未知'});
-          </script>
-        `;
-
-        // 尝试在 </head> 前注入
-        if (html.includes('</head>')) {
-          html = html.replace('</head>', `${injectedScript}</head>`);
-        }
-        // 备用方案：在 <body> 前注入
-        else if (html.includes('<body')) {
-          html = html.replace('<body', `${injectedScript}<body`);
-        }
-        // 最后方案：在文件末尾注入
-        else {
-          html = html + injectedScript;
-        }
+        // 使用分块注入以处理大型数据集
+        html = injectChunkedData(html, finalData, { maxChunkSize: 4 * 1024 * 1024 }); // 4MB/块
 
         console.log('✅ 数据注入成功');
       } else if (hasInjectedData) {
