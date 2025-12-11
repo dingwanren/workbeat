@@ -158,11 +158,7 @@ private setupRoutesAndMiddleware(): void {
           <script>
             // Git 仓库分析数据 - 嵌入式注入 (已压缩字段名和数据)
             window.__GIT_ANALYSIS_DATA__ = ${JSON.stringify(finalData)};
-            console.log('✅ 嵌入式数据已加载', {
-              commits: window.__GIT_ANALYSIS_DATA__?.cs?.length || 0,
-              authors: window.__GIT_ANALYSIS_DATA__?.am?.length || 0,
-              analysisDate: window.__GIT_ANALYSIS_DATA__?.ad || '未知'
-            });
+            console.log('✅ 嵌入式数据已加载', {commits: window.__GIT_ANALYSIS_DATA__?.cs?.length || 0, authors: window.__GIT_ANALYSIS_DATA__?.am?.length || 0, analysisDate: window.__GIT_ANALYSIS_DATA__?.ad || '未知'});
           </script>
         `;
 
