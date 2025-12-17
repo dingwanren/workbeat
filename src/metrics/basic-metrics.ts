@@ -9,18 +9,26 @@ const { groupBy } = pkg;
  * @returns 作者维度的基础指标数组
  */
 export function calculateBasicMetrics(commits: CommitData[]): AuthorMetrics[] {
+  // 过滤掉无效的提交（确保有完整的作者信息）
+  const validCommits = commits.filter(commit =>
+    commit &&
+    commit.author &&
+    commit.author.name !== undefined &&
+    commit.author.email !== undefined
+  );
+
   // 按作者分组
-  const commitsByAuthor = groupBy(commits, (commit) => `${commit.author.name}<${commit.author.email}>`);
-  
+  const commitsByAuthor = groupBy(validCommits, (commit) => `${commit.author.name}<${commit.author.email}>`);
+
   const authorMetrics: AuthorMetrics[] = [];
-  
+
   for (const [authorKey, authorCommits] of Object.entries(commitsByAuthor)) {
     // 解析作者信息
     const match = authorKey.match(/^(.+?)<(.+?)>$/);
     if (!match) continue;
-    
+
     const [, name, email] = match;
-    
+
     // 计算各项指标
     const commitCount = authorCommits.length;
 
@@ -29,12 +37,12 @@ export function calculateBasicMetrics(commits: CommitData[]): AuthorMetrics[] {
     const totalDeletions = authorCommits.reduce((sum, commit) => sum + commit.totalDeletions, 0);
 
     const netChanges = totalInsertions - totalDeletions;
-    
+
     // 找到首次和最后提交时间
     const dates = authorCommits.map(commit => new Date(commit.timestamp));
     const firstCommitDate = new Date(Math.min(...dates.map(date => date.getTime())));
     const lastCommitDate = new Date(Math.max(...dates.map(date => date.getTime())));
-    
+
     authorMetrics.push({
       author: {
         name,
@@ -48,7 +56,7 @@ export function calculateBasicMetrics(commits: CommitData[]): AuthorMetrics[] {
       lastCommitDate
     });
   }
-  
+
   return authorMetrics;
 }
 

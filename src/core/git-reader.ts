@@ -3,8 +3,13 @@
  * 支持全分支日志获取和详细变更统计
  */
 
-import simpleGit, { SimpleGit } from 'simple-git';
+import simpleGit, { SimpleGit, GitError } from 'simple-git';
 import { CommitData, FileChange, GitReaderOptions } from '../types/commit.js';
+
+// 常量定义，避免魔法字符串
+const GIT_PAGER_ENV = { GIT_PAGER: '' };
+const COMMIT_DELIMITER = '|';
+const FILE_CHANGE_REGEX = /^(\d+|-)\t(\d+|-)\t(.+)$/;
 
 /**
  * Git仓库读取器类
@@ -16,8 +21,8 @@ export class GitReader {
   constructor(repoPath: string, options: GitReaderOptions = {}) {
     this.git = simpleGit(repoPath);
     this.options = {
-      includeAllBranches: true,
-      parseFileDetails: true,
+      includeAllBranches: false,
+      parseFileDetails: false,
       ...options
     };
   }
@@ -29,153 +34,167 @@ export class GitReader {
    */
   async getCommitLog(maxCount: number = 0): Promise<CommitData[]> {
     try {
-      // 1. 构建日志参数
+      // 1. 构建优化参数
       const logArgs = this.buildLogArguments(maxCount);
       
-      // 2. 使用 raw 命令执行自定义 git log
-      const rawLog = await this.git.raw(logArgs);
+      // 2. 使用raw命令并禁用分页器（通过环境变量）
+      const rawLog = await this.git.env(GIT_PAGER_ENV).raw(logArgs);
       
-      // 3. 解析原始日志
+      // 3. 流式解析原始日志
       const commits = await this.parseRawLog(rawLog);
       
       return commits;
     } catch (error) {
-      console.error('读取Git日志时发生错误:', error);
-      throw new Error(`无法读取仓库的提交历史: ${error}`);
+      if (error instanceof GitError) {
+        throw new Error(`Git操作失败: ${error.message}`);
+      }
+      throw new Error(`读取仓库提交历史失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   /**
-   * 构建 git log 命令参数
+   * 构建git log命令参数（优化版）
    */
   private buildLogArguments(maxCount: number): string[] {
-    const args: string[] = ['log'];
+    // 预先计算参数数量，避免动态扩容
+    const estimatedArgCount = 6;
+    const args: string[] = new Array(estimatedArgCount);
+    let index = 0;
     
-    // 关键：添加 --all 获取全部分支
+    args[index++] = 'log';
+
     if (this.options.includeAllBranches) {
-      args.push('--all');
+      args[index++] = '--all';
     }
-    
-    // 添加 --numstat 获取详细变更统计
+
+    // 使用 --no-merges 参数排除合并提交
+    args[index++] = '--no-merges';
+
     if (this.options.parseFileDetails) {
-      args.push('--numstat');
+      args[index++] = '--numstat';
     }
-    
-    // 自定义输出格式，便于解析
-    args.push('--pretty=format:%H|%aN|%aE|%aI|%s|%P');
-    
-    // 添加日期格式
-    args.push('--date=iso');
-    
-    // 限制数量（如果有）
+
+    // 优化格式字符串，减少解析复杂度
+    args[index++] = `--pretty=format:%H${COMMIT_DELIMITER}%aN${COMMIT_DELIMITER}%aE${COMMIT_DELIMITER}%aI${COMMIT_DELIMITER}%s${COMMIT_DELIMITER}%P`;
+    args[index++] = '--date=iso';
+
     if (maxCount > 0) {
-      args.push(`-n ${maxCount}`);
+      args[index++] = `-n ${maxCount}`;
     }
+
+    args[index++] = '--reverse';
     
-    // 添加排序（按时间倒序）
-    args.push('--reverse');
-    
-    return args;
+    // 修剪未使用的数组位置
+    return args.slice(0, index);
   }
 
   /**
-   * 解析原始日志输出
+   * 解析原始日志输出（优化版）
    */
   private async parseRawLog(rawLog: string): Promise<CommitData[]> {
-    const lines = rawLog.trim().split('\n');
+    if (!rawLog.trim()) {
+      return [];
+    }
+    
     const commits: CommitData[] = [];
-    
-    let currentCommit: Partial<CommitData> | null = null;
+    const lines = rawLog.split('\n');
+    const lineCount = lines.length;
+
+    let currentCommit: CommitData | null = null;
     let currentFileChanges: FileChange[] = [];
-    
-    for (const line of lines) {
-      // 1. 检查是否为提交信息行
-      if (this.isCommitInfoLine(line)) {
+
+    for (let i = 0; i < lineCount; i++) {
+      const line = lines[i].trim(); // Clean up whitespace
+      if (!line) continue; // Skip empty lines
+
+      // 1. 检查是否为提交信息行（使用索引判断性能更优）
+      const delimiterIndex = line.indexOf(COMMIT_DELIMITER);
+      if (delimiterIndex !== -1 && delimiterIndex < 50) { // Hash通常40字符
         // 保存上一个提交
         if (currentCommit) {
-          currentCommit.fileChanges = currentFileChanges;
-          currentCommit.totalInsertions = this.calculateTotalInsertions(currentFileChanges);
-          currentCommit.totalDeletions = this.calculateTotalDeletions(currentFileChanges);
-          commits.push(currentCommit as CommitData);
+          this.finalizeCommit(currentCommit, currentFileChanges);
+          commits.push(currentCommit);
         }
-        
-        // 解析新的提交信息
-        const commitInfo = this.parseCommitInfoLine(line);
-        currentCommit = {
-          hash: commitInfo.hash,
-          author: {
-            name: commitInfo.authorName,
-            email: commitInfo.authorEmail
-          },
-          timestamp: new Date(commitInfo.date),
-          message: commitInfo.message,
-          parentHashes: commitInfo.parentHashes,
-          fileChanges: [],
-          totalInsertions: 0,
-          totalDeletions: 0,
-          filesChanged: 0
-        };
+
+        // 解析新提交，添加错误处理
+        try {
+          currentCommit = this.parseCommitInfoLine(line);
+          // Validate that we got a proper commit object
+          if (!currentCommit || !currentCommit.hash) {
+            console.warn(`Invalid commit parsed from line: ${line.substring(0, 100)}...`);
+            currentCommit = null;
+            continue;
+          }
+        } catch (error) {
+          console.warn(`Failed to parse commit from line: ${line.substring(0, 100)}..., error: ${error}`);
+          currentCommit = null;
+          continue;
+        }
+
         currentFileChanges = [];
+
       }
       // 2. 检查是否为文件变更统计行
-      else if (this.isFileChangeLine(line)) {
-        const fileChange = this.parseFileChangeLine(line);
-        if (fileChange) {
-          currentFileChanges.push(fileChange);
+      else if (FILE_CHANGE_REGEX.test(line)) {
+        if (currentCommit) { // Only process file changes if we have a current commit
+          const fileChange = this.parseFileChangeLine(line);
+          if (fileChange) {
+            currentFileChanges.push(fileChange);
+          }
         }
       }
     }
     
     // 添加最后一个提交
     if (currentCommit) {
-      currentCommit.fileChanges = currentFileChanges;
-      currentCommit.totalInsertions = this.calculateTotalInsertions(currentFileChanges);
-      currentCommit.totalDeletions = this.calculateTotalDeletions(currentFileChanges);
-      currentCommit.filesChanged = currentFileChanges.length;
-      commits.push(currentCommit as CommitData);
+      this.finalizeCommit(currentCommit, currentFileChanges);
+      commits.push(currentCommit);
     }
-    
-    return commits;
+
+    // Filter out any undefined entries that might have slipped through
+    return commits.filter(commit => commit !== undefined && commit !== null);
   }
 
   /**
-   * 解析提交信息行
-   * 格式: hash|authorName|authorEmail|date|message|parentHashes
+   * 解析提交信息行（优化版）
    */
-  private parseCommitInfoLine(line: string): {
-    hash: string;
-    authorName: string;
-    authorEmail: string;
-    date: string;
-    message: string;
-    parentHashes: string[];
-  } {
-    const parts = line.split('|');
-    
+  private parseCommitInfoLine(line: string): CommitData {
+    // 使用split但限制分割次数，提高性能
+    const parts = line.split(COMMIT_DELIMITER, 6);
+
+    // 确保我们至少有足够的部分来构建基本的提交信息
+    if (parts.length < 4) {
+      throw new Error(`Invalid commit line format: ${line.substring(0, 100)}...`);
+    }
+
     return {
-      hash: parts[0] || '',
-      authorName: parts[1] || '',
-      authorEmail: parts[2] || '',
-      date: parts[3] || '',
-      message: parts[4] || '',
-      parentHashes: parts[5] ? parts[5].split(' ') : []
+      hash: parts[0]?.trim() || '',
+      author: {
+        name: parts[1]?.trim() || '',
+        email: parts[2]?.trim() || ''
+      },
+      timestamp: new Date(parts[3]?.trim() || Date.now()),
+      message: parts[4]?.trim() || '',
+      parentHashes: parts[5]?.trim() ? parts[5].trim().split(' ') : [],
+      fileChanges: [],
+      totalInsertions: 0,
+      totalDeletions: 0,
+      filesChanged: 0
     };
   }
 
   /**
-   * 解析文件变更行
-   * 格式: insertions\tdeletions\tfilename
+   * 解析文件变更行（优化版）
    */
   private parseFileChangeLine(line: string): FileChange | null {
-    const parts = line.split('\t');
-    
-    if (parts.length !== 3) {
+    const match = line.match(FILE_CHANGE_REGEX);
+    if (!match) {
       return null;
     }
     
-    const [insertionsStr, deletionsStr, filename] = parts;
+    const [, insertionsStr, deletionsStr, filename] = match;
     
-    // 处理二进制文件（显示为 '-'）
+    // 优化二进制文件处理
     const insertions = insertionsStr === '-' ? 0 : parseInt(insertionsStr, 10) || 0;
     const deletions = deletionsStr === '-' ? 0 : parseInt(deletionsStr, 10) || 0;
     
@@ -188,59 +207,57 @@ export class GitReader {
   }
 
   /**
-   * 检测文件语言（基于扩展名）
+   * 检测文件语言（优化版）
    */
   private detectFileLanguage(filename: string): string {
-    const extension = filename.split('.').pop()?.toLowerCase() || '';
+    const lastDotIndex = filename.lastIndexOf('.');
+    if (lastDotIndex === -1) {
+      return 'unknown';
+    }
     
-    const languageMap: Record<string, string> = {
-      'js': 'JavaScript',
-      'ts': 'TypeScript',
-      'jsx': 'JSX',
-      'tsx': 'TSX',
-      'vue': 'Vue',
-      'css': 'CSS',
-      'scss': 'SCSS',
-      'html': 'HTML',
-      'json': 'JSON',
-      'md': 'Markdown',
-      'py': 'Python',
-      'java': 'Java',
-      'cpp': 'C++',
-      'go': 'Go',
-      'rs': 'Rust'
-    };
+    const extension = filename.slice(lastDotIndex + 1).toLowerCase();
     
-    return languageMap[extension] || extension;
+    // 使用Map替代对象，查找性能更好
+    const languageMap = new Map([
+      ['js', 'JavaScript'],
+      ['ts', 'TypeScript'],
+      ['jsx', 'JSX'],
+      ['tsx', 'TSX'],
+      ['vue', 'Vue'],
+      ['css', 'CSS'],
+      ['scss', 'SCSS'],
+      ['html', 'HTML'],
+      ['json', 'JSON'],
+      ['md', 'Markdown'],
+      ['py', 'Python'],
+      ['java', 'Java'],
+      ['cpp', 'C++'],
+      ['go', 'Go'],
+      ['rs', 'Rust']
+    ]);
+    
+    return languageMap.get(extension) || extension;
   }
 
   /**
-   * 检查是否为提交信息行
+   * 完成提交的统计计算
    */
-  private isCommitInfoLine(line: string): boolean {
-    return line.includes('|') && line.split('|').length >= 5;
-  }
-
-  /**
-   * 检查是否为文件变更行
-   */
-  private isFileChangeLine(line: string): boolean {
-    // 格式: number\tnumber\tfilename 或 -\t-\tfilename
-    return /^(\d+|-\t)\t(\d+|-\t)\t.+$/.test(line);
-  }
-
-  /**
-   * 计算总插入行数
-   */
-  private calculateTotalInsertions(fileChanges: FileChange[]): number {
-    return fileChanges.reduce((sum, file) => sum + file.insertions, 0);
-  }
-
-  /**
-   * 计算总删除行数
-   */
-  private calculateTotalDeletions(fileChanges: FileChange[]): number {
-    return fileChanges.reduce((sum, file) => sum + file.deletions, 0);
+  private finalizeCommit(commit: CommitData, fileChanges: FileChange[]): void {
+    commit.fileChanges = fileChanges;
+    
+    // 批量计算统计信息，减少循环次数
+    let totalInsertions = 0;
+    let totalDeletions = 0;
+    
+    for (let i = 0; i < fileChanges.length; i++) {
+      const change = fileChanges[i];
+      totalInsertions += change.insertions;
+      totalDeletions += change.deletions;
+    }
+    
+    commit.totalInsertions = totalInsertions;
+    commit.totalDeletions = totalDeletions;
+    commit.filesChanged = fileChanges.length;
   }
 
   /**
@@ -248,14 +265,15 @@ export class GitReader {
    */
   async getCommitDetails(hash: string): Promise<CommitData | null> {
     try {
+      // 复用相同的参数构建逻辑
       const logArgs = [
         'show',
         hash,
         '--numstat',
-        '--pretty=format:%H|%aN|%aE|%aI|%s|%P'
+        `--pretty=format:%H${COMMIT_DELIMITER}%aN${COMMIT_DELIMITER}%aE${COMMIT_DELIMITER}%aI${COMMIT_DELIMITER}%s${COMMIT_DELIMITER}%P`
       ];
       
-      const rawOutput = await this.git.raw(logArgs);
+      const rawOutput = await this.git.env(GIT_PAGER_ENV).raw(logArgs);
       const commits = await this.parseRawLog(rawOutput);
       
       return commits[0] || null;
@@ -266,7 +284,7 @@ export class GitReader {
   }
 
   /**
-   * 检查是否为有效的 Git 仓库
+   * 检查是否为有效的Git仓库
    */
   async isValidGitRepository(): Promise<boolean> {
     try {
@@ -274,29 +292,6 @@ export class GitReader {
     } catch (error) {
       console.error('检查Git仓库时发生错误:', error);
       return false;
-    }
-  }
-
-  /**
-   * 获取仓库信息
-   */
-  async getRepositoryInfo() {
-    try {
-      const [branches, tags, remote] = await Promise.all([
-        this.git.branchLocal(),
-        this.git.tags(),
-        this.git.getRemotes(true)
-      ]);
-      
-      return {
-        branchCount: branches.all.length,
-        tagCount: tags.all.length,
-        currentBranch: branches.current,
-        remotes: remote.map(r => r.name)
-      };
-    } catch (error) {
-      console.error('获取仓库信息时发生错误:', error);
-      return null;
     }
   }
 }

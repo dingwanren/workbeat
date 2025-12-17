@@ -54,39 +54,21 @@ export class WebServer {
   }
   
   private initializeServer(): void {
-    // 调试信息
-    console.log('🔧 服务器配置:');
-    console.log(`   端口: ${this.options.port}`);
-    console.log(`   静态文件目录: ${this.options.staticDir}`);
-    console.log(`   嵌入式数据: ${this.options.analysisData ? '已加载' : '无'}`);
-    
-    if (this.options.analysisData) {
-      console.log(`   提交数量: ${this.options.analysisData?.commits?.length || 0}`);
-      console.log(`   作者数量: ${this.options.analysisData?.authorMetrics?.length || 0}`);
-    }
-    
-    if (existsSync(this.options.staticDir)) {
-      const files = readdirSync(this.options.staticDir);
-      console.log(`   静态文件数量: ${files.length}`);
+    // 验证静态文件目录存在
+    if (!existsSync(this.options.staticDir)) {
+      throw new Error(`静态文件目录不存在: ${this.options.staticDir}`);
     }
   }
   
 private setupRoutesAndMiddleware(): void {
-  console.log('🔄 设置路由和中间件...');
 
   // ==================== 第一步：设置请求日志中间件 ====================
   this.app.use((req: Request, res: Response, next) => {
-    // 跳过静态文件的详细日志
-    const isStaticFile = req.url.match(/\.(js|css|png|jpg|svg|ico|woff|ttf)$/);
-    if (!isStaticFile) {
-      console.log(`📨 ${req.method} ${req.url}`);
-    }
     next();
   });
 
   // ==================== 第二步：设置根路由（注入数据） ====================
   this.app.get('/', (req: Request, res: Response): void => {
-    console.log('🎯 处理根路由请求');
     this.serveIndexWithData(res);
   });
 
@@ -104,7 +86,6 @@ private setupRoutesAndMiddleware(): void {
   // 静态文件服务（处理 /assets/ 等静态资源）
   // 注意：这会在路由之后执行，所以不会拦截根路由
   this.app.use(express.static(this.options.staticDir, staticOptions));
-  console.log('✅ 静态文件中间件已设置');
 
   // ==================== 第四步：设置智能客户端路由回退 ====================
   this.app.get('*', (req: Request, res: Response, next): void => {
@@ -112,7 +93,6 @@ private setupRoutesAndMiddleware(): void {
 
     // 跳过有扩展名的请求（这些应该由静态文件中间件处理）
     if (url.match(/\.\w+$/)) {
-      console.log(`⏭️  跳过静态文件请求: ${url}`);
       return next(); // 让静态文件中间件处理
     }
 
@@ -121,11 +101,8 @@ private setupRoutesAndMiddleware(): void {
       return next();
     }
 
-    console.log(`🔄 处理客户端路由: ${url}`);
     this.serveIndexWithData(res);
   });
-
-  console.log('✅ 路由和中间件设置完成');
 }
   
   /**
@@ -133,44 +110,34 @@ private setupRoutesAndMiddleware(): void {
    */
   private serveIndexWithData(res: Response): void {
     const indexPath = path.join(this.options.staticDir, 'index.html');
-    
+
     if (!existsSync(indexPath)) {
-      console.error('❌ index.html 不存在');
       res.status(404).send('index.html not found');
       return;
     }
-    
+
     try {
       // 读取 HTML 文件
       let html = readFileSync(indexPath, 'utf-8');
-      
+
       // 检查是否已有数据注入
       const hasInjectedData = html.includes('__GIT_ANALYSIS_DATA__');
 
       // 注入嵌入式数据
       if (this.options.analysisData && !hasInjectedData) {
-        console.log('💉 注入嵌入式数据到 index.html');
-
         // 使用缩短的字段名并转换时间戳和哈希值
         const compacted = this.shortenFieldNames(this.options.analysisData);
         const finalData = this.compactParentHashesAndTimestamps(compacted);
 
         // 使用分块注入以处理大型数据集
         html = injectChunkedData(html, finalData, { maxChunkSize: 4 * 1024 * 1024 }); // 4MB/块
-
-        console.log('✅ 数据注入成功');
-      } else if (hasInjectedData) {
-        console.log('ℹ️  index.html 已包含嵌入式数据');
-      } else {
-        console.log('⚠️  无分析数据可注入');
       }
-      
+
       // 发送响应
       res.setHeader('Content-Type', 'text/html');
       res.send(html);
-      
+
     } catch (error) {
-      console.error('❌ 处理 index.html 失败:', error);
       res.status(500).send('服务器内部错误');
     }
   }

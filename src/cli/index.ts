@@ -11,16 +11,21 @@ import { HtmlReportGenerator } from '../visualizer/html-report-generator.js';
  * 统一的 Git 数据获取逻辑
  */
 async function analyzeRepositoryData(
-  repoPath: string, 
+  repoPath: string,
+  includeAllBranches: boolean = false,
+  parseFileDetails: boolean = false,
   logCallback?: (message: string) => void
 ): Promise<{ commits: CommitData[], metrics: AuthorMetrics[] }> {
-  
+
   logCallback?.('🚀 开始分析仓库...');
-  const gitReader = new GitReader(repoPath);
+  const gitReader = new GitReader(repoPath, {
+    includeAllBranches,
+    parseFileDetails
+  });
 
   logCallback?.('📖 正在读取 Git 提交历史...');
   const commits = await gitReader.getCommitLog();
-  logCallback?.(`✅ 获取到 ${commits.length} 条提交记录`);
+  logCallback?.(`✅ 获取到 ${commits.length} 条提交记录（已排除合并提交）`);
 
   logCallback?.('📊 正在分析作者贡献指标...');
   const metrics = await analyzeRepository(commits, logCallback);
@@ -35,12 +40,12 @@ async function analyzeRepositoryData(
 function consoleOutputMode(commits: CommitData[], metrics: AuthorMetrics[]) {
   console.log('\n📊 分析结果摘要:');
   console.log('='.repeat(40));
-  
+
   // 核心统计数据
-  console.log(`📈 提交总数: ${commits.length}`);
+  console.log(`📈 提交总数: ${commits.length} (已排除合并提交)`);
   console.log(`👥 作者总数: ${metrics.length}`);
-  
-  const totalChanges = commits.reduce((sum, commit) => 
+
+  const totalChanges = commits.reduce((sum, commit) =>
     sum + (commit.totalInsertions || 0) + (commit.totalDeletions || 0), 0);
   console.log(`✏️  代码变更: ${totalChanges.toLocaleString()} 行`);
   
@@ -146,11 +151,15 @@ program
   .option('-p, --port <number>', 'Web服务端口', '3000')
   .option('-q, --quiet', '安静模式，仅输出必要信息')
   .option('-r, --report [path]', '导出HTML报告到指定路径，如果不指定则默认为当前目录下的workbeat-report.html')
+  .option('-a, --all', '包含所有分支的提交记录，默认为false')
+  .option('-d, --detail', '解析详细的文件变更信息，默认为false')
   .action(async (repoPath: string, options: {
     serve?: boolean;
     report?: string | boolean;
     port?: string;
     quiet?: boolean;
+    all?: boolean;
+    detail?: boolean;
   }) => {
     try {
       // 检查 --serve 和 --report 是否同时使用
@@ -161,7 +170,12 @@ program
 
       // 获取数据
       const logCallback = options.quiet ? undefined : console.log;
-      const { commits, metrics } = await analyzeRepositoryData(repoPath, logCallback);
+      const { commits, metrics } = await analyzeRepositoryData(
+        repoPath,
+        options.all || false,
+        options.detail || false,
+        logCallback
+      );
 
       // 根据选项决定输出方式
       if (options.report !== undefined) {
