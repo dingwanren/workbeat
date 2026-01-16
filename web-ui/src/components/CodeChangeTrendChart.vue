@@ -16,7 +16,7 @@
     
     <div v-if="loading" class="loading">加载图表数据...</div>
     <div v-else-if="!hasData" class="no-data">暂无代码变更数据</div>
-    <VChart 
+    <VChart
       v-else
       class="chart"
       :option="chartOption"
@@ -43,7 +43,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart, BarChart } from 'echarts/charts'
@@ -100,24 +100,24 @@ const granularityOptions = [
 // 修正的 hasData 计算属性
 const hasData = computed(() => {
   if (!props.data?.commits?.length) return false
-  
+
   // 检查数据格式：可能有 totalInsertions/totalDeletions 或 fileChanges
   const commits = props.data.commits
   const hasAnyChanges = commits.some(commit => {
     // 方式1：直接有 totalInsertions/totalDeletions
     if (commit.totalInsertions > 0 || commit.totalDeletions > 0) return true
-    
+
     // 方式2：通过 fileChanges 计算
     if (commit.fileChanges?.length) {
-      const hasFileChanges = commit.fileChanges.some(file => 
+      const hasFileChanges = commit.fileChanges.some(file =>
         file.insertions > 0 || file.deletions > 0
       )
       if (hasFileChanges) return true
     }
-    
+
     return false
   })
-  
+
   return hasAnyChanges
 })
 
@@ -139,20 +139,20 @@ const getCommitChanges = (commit) => {
       deletions: commit.totalDeletions || 0
     }
   }
-  
+
   // 方式2：通过 fileChanges 计算
   if (commit.fileChanges?.length) {
     let totalInsertions = 0
     let totalDeletions = 0
-    
+
     commit.fileChanges.forEach(file => {
       totalInsertions += file.insertions || 0
       totalDeletions += file.deletions || 0
     })
-    
+
     return { insertions: totalInsertions, deletions: totalDeletions }
   }
-  
+
   // 方式3：尝试从 chartData 获取
   if (props.data.chartData?.totalInsertionsSum !== undefined) {
     // 如果只有一个作者，直接使用总量
@@ -165,26 +165,26 @@ const getCommitChanges = (commit) => {
       }
     }
   }
-  
+
   return { insertions: 0, deletions: 0 }
 }
 
 // 核心函数：根据粒度处理代码变更数据
 const processCodeChangeData = (granularity) => {
   if (!hasData.value) return { dates: [], insertions: [], deletions: [], netChanges: [] }
-  
+
   const commits = props.data.commits
   const groupedData = {}
-  
+
   // 初始化汇总数据
   let totalInsertions = 0
   let totalDeletions = 0
-  
+
   commits.forEach(commit => {
     const changes = getCommitChanges(commit)
     const date = new Date(commit.timestamp)
     let key
-    
+
     switch (granularity) {
       case 'month':
         key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
@@ -198,58 +198,83 @@ const processCodeChangeData = (granularity) => {
         key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
         break
     }
-    
+
     if (!groupedData[key]) {
       groupedData[key] = { insertions: 0, deletions: 0 }
     }
-    
+
     // 累加该时间粒度的增删行数
     groupedData[key].insertions += changes.insertions
     groupedData[key].deletions += changes.deletions
-    
+
     // 更新总计数
     totalInsertions += changes.insertions
     totalDeletions += changes.deletions
   })
-  
+
   // 更新汇总数据
   summary.value = {
     totalInsertions,
     totalDeletions,
     netChanges: totalInsertions - totalDeletions
   }
-  
+
   // 按时间排序
   const sortedKeys = Object.keys(groupedData).sort()
   const dates = []
   const insertions = []
   const deletions = []
   const netChanges = []
-  
+
   sortedKeys.forEach(key => {
     dates.push(key)
     insertions.push(groupedData[key].insertions)
     deletions.push(groupedData[key].deletions)
     netChanges.push(groupedData[key].insertions - groupedData[key].deletions)
   })
-  
+
   return { dates, insertions, deletions, netChanges }
 }
+
+// 计算当前显示的数据范围
+const currentVisibleRange = ref({ start: 0, end: 100 })
+
+// 判断当前粒度下是否应该显示x轴标签
+const shouldShowXAxisLabels = computed(() => {
+  if (!hasData.value) return true
+
+  const processedData = processCodeChangeData(activeGranularity.value)
+  const totalPoints = processedData.dates.length
+
+  // 计算当前可见的数据点数量
+  const visibleRatio = (currentVisibleRange.value.end - currentVisibleRange.value.start) / 100
+  const visiblePoints = Math.ceil(totalPoints * visibleRatio)
+
+  // 根据不同的粒度设置阈值
+  let threshold = 15 // 默认阈值为15个单位
+  if (activeGranularity.value === 'week') {
+    threshold = 8 // 周粒度下最多显示8个标签
+  } else if (activeGranularity.value === 'month') {
+    threshold = 6 // 月粒度下最多显示6个标签
+  }
+
+  return visiblePoints <= threshold
+})
 
 // 计算属性：生成图表配置
 const chartOption = computed(() => {
   if (!hasData.value) return {}
-  
+
   const processedData = processCodeChangeData(activeGranularity.value)
-  
+
   if (processedData.dates.length === 0) return {}
-  
+
   const granularityText = {
     day: '日期',
     week: '周次',
     month: '月份'
   }[activeGranularity.value]
-  
+
   return {
     title: {
       text: '代码变更趋势',
@@ -270,7 +295,7 @@ const chartOption = computed(() => {
           const color = param.color
           const value = param.value
           const sign = value >= 0 ? '+' : ''
-          
+
           switch(param.seriesName) {
             case '新增代码行':
               html += `<div style="display: flex; align-items: center;">
@@ -311,6 +336,7 @@ const chartOption = computed(() => {
       type: 'category',
       data: processedData.dates,
       axisLabel: {
+        show: shouldShowXAxisLabels.value,
         rotate: processedData.dates.length > 10 ? 45 : 0,
         interval: 0
       },
@@ -386,8 +412,9 @@ const chartOption = computed(() => {
     dataZoom: [
       {
         type: 'inside',
-        start: 0,
-        end: 100
+        start: currentVisibleRange.value.start,
+        end: currentVisibleRange.value.end,
+        throttle: 100 // 设置节流，避免频繁触发
       }
     ]
   }
@@ -396,6 +423,8 @@ const chartOption = computed(() => {
 // 切换时间粒度
 const changeGranularity = (granularity) => {
   activeGranularity.value = granularity
+  // 重置缩放范围
+  currentVisibleRange.value = { start: 0, end: 100 }
 }
 
 // 监听数据变化

@@ -14,6 +14,7 @@ async function analyzeRepositoryData(
   repoPath: string,
   includeAllBranches: boolean = false,
   parseFileDetails: boolean = false,
+  gitArgs?: string,
   logCallback?: (message: string) => void
 ): Promise<{ commits: CommitData[], metrics: AuthorMetrics[] }> {
 
@@ -24,7 +25,7 @@ async function analyzeRepositoryData(
   });
 
   logCallback?.('📖 正在读取 Git 提交历史...');
-  const commits = await gitReader.getCommitLog();
+  const commits = await gitReader.getCommitLog(0, gitArgs ? parseGitArgs(gitArgs) : undefined);
   logCallback?.(`✅ 获取到 ${commits.length} 条提交记录（已排除合并提交）`);
 
   logCallback?.('📊 正在分析作者贡献指标...');
@@ -32,6 +33,37 @@ async function analyzeRepositoryData(
   logCallback?.(`✅ 完成 ${metrics.length} 位作者的分析`);
 
   return { commits, metrics };
+}
+
+/**
+ * 解析并验证git参数
+ * 只允许时间范围相关的参数
+ */
+function parseGitArgs(gitArgs: string): string[] {
+  const allowedArgs = ['--since', '--until', '--after', '--before'];
+  const args = gitArgs.trim().split(/\s+/);
+  const result: string[] = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    // 检查是否为允许的参数
+    if (allowedArgs.some(allowedArg => arg === allowedArg || arg.startsWith(allowedArg + '='))) {
+      if (arg.includes('=')) {
+        // 参数和值在同一个字符串中，如 --since=2023-01-01
+        result.push(arg);
+      } else {
+        // 参数和值在不同位置，如 --since 2023-01-01
+        result.push(arg);
+        // 如果还有下一个参数且不是另一个选项，则它应该是值
+        if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+          result.push(args[i + 1]);
+          i++; // 跳过下一个参数，因为它已被使用
+        }
+      }
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -153,6 +185,7 @@ program
   .option('-r, --report [path]', '导出HTML报告到指定路径，如果不指定则默认为当前目录下的workbeat-report.html')
   .option('-a, --all', '包含所有分支的提交记录，默认为false')
   .option('-d, --detail', '解析详细的文件变更信息，默认为false')
+  .option('--git-args <args>', '透传给git log的参数（只支持--since, --until, --after, --before）')
   .action(async (repoPath: string, options: {
     serve?: boolean;
     report?: string | boolean;
@@ -160,6 +193,7 @@ program
     quiet?: boolean;
     all?: boolean;
     detail?: boolean;
+    gitArgs?: string;
   }) => {
     try {
       // 检查 --serve 和 --report 是否同时使用
@@ -174,6 +208,7 @@ program
         repoPath,
         options.all || false,
         options.detail || false,
+        options.gitArgs,
         logCallback
       );
 

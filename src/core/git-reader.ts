@@ -30,19 +30,20 @@ export class GitReader {
   /**
    * 获取仓库的提交日志（支持全部分支）
    * @param maxCount 限制返回的提交数量，0表示无限制
+   * @param extraArgs 额外的git log参数
    * @returns 解析后的提交数据数组
    */
-  async getCommitLog(maxCount: number = 0): Promise<CommitData[]> {
+  async getCommitLog(maxCount: number = 0, extraArgs?: string[]): Promise<CommitData[]> {
     try {
       // 1. 构建优化参数
-      const logArgs = this.buildLogArguments(maxCount);
-      
+      const logArgs = this.buildLogArguments(maxCount, extraArgs);
+
       // 2. 使用raw命令并禁用分页器（通过环境变量）
       const rawLog = await this.git.env(GIT_PAGER_ENV).raw(logArgs);
-      
+
       // 3. 流式解析原始日志
       const commits = await this.parseRawLog(rawLog);
-      
+
       return commits;
     } catch (error) {
       if (error instanceof GitError) {
@@ -55,12 +56,14 @@ export class GitReader {
   /**
    * 构建git log命令参数（优化版）
    */
-  private buildLogArguments(maxCount: number): string[] {
+  private buildLogArguments(maxCount: number, extraArgs?: string[]): string[] {
     // 预先计算参数数量，避免动态扩容
-    const estimatedArgCount = 6;
+    const baseArgsCount = 6;
+    const extraArgsCount = extraArgs ? extraArgs.length : 0;
+    const estimatedArgCount = baseArgsCount + extraArgsCount;
     const args: string[] = new Array(estimatedArgCount);
     let index = 0;
-    
+
     args[index++] = 'log';
 
     if (this.options.includeAllBranches) {
@@ -74,6 +77,13 @@ export class GitReader {
       args[index++] = '--numstat';
     }
 
+    // 添加用户指定的额外参数
+    if (extraArgs) {
+      for (const extraArg of extraArgs) {
+        args[index++] = extraArg;
+      }
+    }
+
     // 优化格式字符串，减少解析复杂度
     args[index++] = `--pretty=format:%H${COMMIT_DELIMITER}%aN${COMMIT_DELIMITER}%aE${COMMIT_DELIMITER}%aI${COMMIT_DELIMITER}%s${COMMIT_DELIMITER}%P`;
     args[index++] = '--date=iso';
@@ -83,7 +93,7 @@ export class GitReader {
     }
 
     args[index++] = '--reverse';
-    
+
     // 修剪未使用的数组位置
     return args.slice(0, index);
   }

@@ -74,7 +74,7 @@ import { ref, onMounted } from 'vue'
 import { expandFieldNames, isCompactFormat } from './utils/expandFieldNames.js'
 import TeamAnalysis from './components/TeamAnalysis.vue'
 // import WorkTimeChart from './components/WorkTimeChart.vue'
-import CodeTrendChart from './components/CodeTrendChart.vue'
+// import CodeTrendChart from './components/CodeTrendChart.vue'
 // import CommitScatterPlot from './components/CommitScatterPlot.vue'
 import HeatmapChart from './components/HeatmapChart.vue'
 import CommitTrendChart from './components/CommitTrendChart.vue'
@@ -85,7 +85,7 @@ export default {
   components: {
     TeamAnalysis,
     // WorkTimeChart,
-    CodeTrendChart,
+    // CodeTrendChart,
     // CommitScatterPlot,
     HeatmapChart,
     CommitTrendChart,
