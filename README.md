@@ -52,15 +52,31 @@ npx workbeat /path/to/repo --report /custom/path/report.html
 
 # 安静模式（仅输出必要信息）
 npx workbeat /path/to/repo --quiet
+
+# 包含所有分支的提交记录
+npx workbeat /path/to/repo --all
+
+# 解析详细的文件变更信息
+npx workbeat /path/to/repo --detail
+
+# 使用特定时间范围分析（例如：分析2023年的提交）
+npx workbeat /path/to/repo --git-args "--since=2023-01-01 --until=2023-12-31"
+
+# 组合使用多个选项
+npx workbeat /path/to/repo --all --detail --report ./my-report.html
 ```
 
 ### 选项说明
 
 - `--serve, -s`: 启动Web可视化服务
 - `--port <number>`: 指定Web服务端口（默认3000）
-- `--report [path]`: 导出HTML报告到指定路径
+- `--report [path]`: 导出HTML报告到指定路径，如果不指定则默认为当前目录下的workbeat-report.html
 - `--quiet, -q`: 安静模式，仅输出必要信息
-- `--help`: 显示帮助信息
+- `--all, -a`: 包含所有分支的提交记录，默认为false
+- `--detail, -d`: 解析详细的文件变更信息，默认为false
+- `--git-args <args>`: 透传给git log的参数（只支持--since, --until, --after, --before）
+- `--help, -h`: 显示帮助信息
+- `--version, -V`: 显示版本号
 
 ### 注意事项
 
@@ -101,20 +117,11 @@ workbeat/
 # 安装所有依赖
 pnpm run install:all
 
-# 构建项目
-npm run build
+# 修改后构建项目
+pnpm run build
 
-# 开发模式（监听文件变化）
-npm run dev
-
-# 启动前端开发服务器
-cd web-ui && pnpm run dev
-
-# 运行TypeScript类型检查
-npx tsc --noEmit
-
-# 代码格式化
-npm run format
+# 启动分析
+pnpm run start . -d -s
 ```
 
 ### 项目架构说明
@@ -125,18 +132,13 @@ npm run format
 4. **可视化 (`src/visualizer`)**: HTML报告生成器
 5. **前端 (`web-ui`)**: Vue.js可视化界面
 
-### 构建流程
 
-1. 首先构建前端Vue应用，输出到 `dist/static/`
-2. 然后使用tsup构建后端Node.js代码
-3. 最终生成可执行的CLI工具
+## 界面截图
 
-### 贡献
-
-1. Fork项目
-2. 创建特性分支
-3. 提交你的修改
-4. 发起Pull Request
+![](./assets/screen_1.png)
+![](./assets/screen_2.png)
+![](./assets/screen_3.png)
+![](./assets/screen_4.png)
 
 ## 许可证
 

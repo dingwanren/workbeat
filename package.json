@@ -1,6 +1,6 @@
 {
   "name": "workbeat",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Analyze Git repository work rhythm",
   "main": "dist/index.js",
   "bin": {
@@ -9,7 +9,6 @@
   "type": "module",
   "scripts": {
     "build": "pnpm run build-vue && tsup",
-    "dev": "tsup --watch",
     "start": "node dist/index.js",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
