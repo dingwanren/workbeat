@@ -1,42 +1,52 @@
 <template>
-  <div class="code-change-trend-chart">
-    <div class="chart-header">
-      <h3>代码变更趋势图</h3>
+  <div class="code-change-trend-chart bg-white p-6 rounded-lg shadow-md card">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-bold text-gray-800 flex items-center">
+        <i class="fas fa-code mr-2 text-primary"></i>
+        代码变更趋势图
+      </h3>
       <div class="granularity-controls">
-        <button 
-          v-for="opt in granularityOptions" 
+        <button
+          v-for="opt in granularityOptions"
           :key="opt.value"
-          :class="['granularity-btn', { 'active': activeGranularity === opt.value }]"
+          :class="[
+            'granularity-btn',
+            activeGranularity === opt.value ? 'active' : ''
+          ]"
           @click="changeGranularity(opt.value)"
         >
           {{ opt.label }}
         </button>
       </div>
     </div>
-    
-    <div v-if="loading" class="loading">加载图表数据...</div>
-    <div v-else-if="!hasData" class="no-data">暂无代码变更数据</div>
+
+    <div v-if="loading" class="flex justify-center items-center h-96">
+      <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-primary"></div>
+    </div>
+    <div v-else-if="!hasData" class="flex justify-center items-center h-96 text-gray-500">
+      <p>暂无代码变更数据</p>
+    </div>
     <VChart
       v-else
       class="chart"
       :option="chartOption"
       autoresize
     />
-    
-    <div class="chart-summary" v-if="!loading && hasData">
-      <div class="summary-item">
-        <span class="summary-label">新增代码行:</span>
-        <span class="summary-value positive">{{ summary.totalInsertions.toLocaleString() }} 行</span>
+
+    <div class="chart-summary mt-6 grid grid-cols-1 md:grid-cols-3 gap-4" v-if="!loading && hasData">
+      <div class="summary-card">
+        <div class="summary-label">新增代码行</div>
+        <div class="summary-value positive">{{ summary.totalInsertions.toLocaleString() }} 行</div>
       </div>
-      <div class="summary-item">
-        <span class="summary-label">删除代码行:</span>
-        <span class="summary-value negative">{{ summary.totalDeletions.toLocaleString() }} 行</span>
+      <div class="summary-card">
+        <div class="summary-label">删除代码行</div>
+        <div class="summary-value negative">{{ summary.totalDeletions.toLocaleString() }} 行</div>
       </div>
-      <div class="summary-item">
-        <span class="summary-label">净增代码行:</span>
-        <span class="summary-value" :class="summary.netChanges >= 0 ? 'positive' : 'negative'">
-          {{ summary.netChanges.toLocaleString() }} 行
-        </span>
+      <div class="summary-card">
+        <div class="summary-label">净增代码行</div>
+        <div class="summary-value" :class="summary.netChanges >= 0 ? 'positive' : 'negative'">
+          {{ summary.netChanges >= 0 ? '+' : '' }}{{ summary.netChanges.toLocaleString() }} 行
+        </div>
       </div>
     </div>
   </div>
@@ -277,20 +287,22 @@ const chartOption = computed(() => {
 
   return {
     title: {
-      text: '代码变更趋势',
-      left: 'center',
-      textStyle: {
-        fontSize: 16,
-        fontWeight: 'normal'
-      }
+      show: false // Hide title since we have it in the header
     },
     tooltip: {
       trigger: 'axis',
       axisPointer: {
         type: 'cross'
       },
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      borderColor: '#3b82f6',
+      borderWidth: 1,
+      textStyle: {
+        color: '#fff',
+        fontSize: 12
+      },
       formatter: (params) => {
-        let html = `<div style="margin-bottom: 5px;"><strong>${params[0].axisValue}</strong></div>`
+        let html = `<div class="p-2"><div><strong>${params[0].axisValue}</strong></div>`
         params.forEach(param => {
           const color = param.color
           const value = param.value
@@ -298,32 +310,36 @@ const chartOption = computed(() => {
 
           switch(param.seriesName) {
             case '新增代码行':
-              html += `<div style="display: flex; align-items: center;">
-                <span style="display: inline-block; width: 10px; height: 10px; background: ${color}; margin-right: 5px; border-radius: 2px;"></span>
-                ${param.seriesName}: <b style="margin-left: 5px; color: ${color}">${sign}${value.toLocaleString()}</b>
+              html += `<div class="flex items-center mt-1">
+                <span class="inline-block w-3 h-3 rounded-sm mr-2" style="background: ${color};"></span>
+                ${param.seriesName}: <b class="ml-1" style="color: ${color}">${sign}${value.toLocaleString()}</b>
               </div>`
               break
             case '删除代码行':
-              html += `<div style="display: flex; align-items: center;">
-                <span style="display: inline-block; width: 10px; height: 10px; background: ${color}; margin-right: 5px; border-radius: 2px;"></span>
-                ${param.seriesName}: <b style="margin-left: 5px; color: ${color}">${sign}${Math.abs(value).toLocaleString()}</b>
+              html += `<div class="flex items-center mt-1">
+                <span class="inline-block w-3 h-3 rounded-sm mr-2" style="background: ${color};"></span>
+                ${param.seriesName}: <b class="ml-1" style="color: ${color}">${sign}${Math.abs(value).toLocaleString()}</b>
               </div>`
               break
             case '净变更':
-              const netColor = value >= 0 ? '#91cc75' : '#ee6666'
-              html += `<div style="display: flex; align-items: center; margin-top: 5px; padding-top: 5px; border-top: 1px solid #eee;">
-                <span style="display: inline-block; width: 10px; height: 10px; background: ${netColor}; margin-right: 5px; border-radius: 2px;"></span>
-                ${param.seriesName}: <b style="margin-left: 5px; color: ${netColor}">${sign}${value.toLocaleString()}</b>
+              const netColor = value >= 0 ? '#10B981' : '#EF4444'
+              html += `<div class="flex items-center mt-2 pt-2 border-t border-gray-600">
+                <span class="inline-block w-3 h-3 rounded-sm mr-2" style="background: ${netColor};"></span>
+                ${param.seriesName}: <b class="ml-1" style="color: ${netColor}">${sign}${value.toLocaleString()}</b>
               </div>`
               break
           }
         })
+        html += '</div>'
         return html
       }
     },
     legend: {
       data: ['新增代码行', '删除代码行', '净变更'],
-      top: '5%'
+      top: '5%',
+      textStyle: {
+        color: '#6B7280'
+      }
     },
     grid: {
       left: '3%',
@@ -338,11 +354,17 @@ const chartOption = computed(() => {
       axisLabel: {
         show: shouldShowXAxisLabels.value,
         rotate: processedData.dates.length > 10 ? 45 : 0,
-        interval: 0
+        interval: 0,
+        color: '#6B7280'
       },
       name: granularityText,
       nameLocation: 'middle',
-      nameGap: 30
+      nameGap: 30,
+      axisLine: {
+        lineStyle: {
+          color: '#E5E7EB'
+        }
+      }
     },
     yAxis: {
       type: 'value',
@@ -350,6 +372,12 @@ const chartOption = computed(() => {
       axisLabel: {
         formatter: function(value) {
           return value >= 0 ? `+${value.toLocaleString()}` : value.toLocaleString()
+        },
+        color: '#6B7280'
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#E5E7EB'
         }
       }
     },
@@ -360,7 +388,7 @@ const chartOption = computed(() => {
         stack: 'total',
         barWidth: '60%',
         itemStyle: {
-          color: '#91cc75'
+          color: '#10B981'
         },
         data: processedData.insertions,
         emphasis: {
@@ -373,7 +401,7 @@ const chartOption = computed(() => {
         stack: 'total',
         barWidth: '60%',
         itemStyle: {
-          color: '#ee6666'
+          color: '#EF4444'
         },
         data: processedData.deletions.map(v => -v),
         emphasis: {
@@ -385,14 +413,16 @@ const chartOption = computed(() => {
         type: 'line',
         smooth: true,
         symbol: 'circle',
-        symbolSize: 8,
+        symbolSize: 6,
         lineStyle: {
           width: 3,
           type: 'solid',
-          color: '#5470c6'
+          color: '#3b82f6'
         },
         itemStyle: {
-          color: '#5470c6'
+          color: '#3b82f6',
+          borderColor: '#FFF',
+          borderWidth: 2
         },
         data: processedData.netChanges,
         markPoint: {
@@ -400,7 +430,7 @@ const chartOption = computed(() => {
             { type: 'max', name: '最大净增' },
             { type: 'min', name: '最大净减' }
           ],
-          symbolSize: 50
+          symbolSize: 40
         },
         markLine: {
           data: [
@@ -437,50 +467,6 @@ watch(() => props.data, () => {
 .code-change-trend-chart {
   width: 100%;
   height: 100%;
-  background: #fff;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.chart-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.chart-header h3 {
-  margin: 0;
-  color: #333;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.granularity-controls {
-  display: flex;
-  gap: 8px;
-}
-
-.granularity-btn {
-  padding: 6px 16px;
-  border: 1px solid #d9d9d9;
-  background: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s;
-}
-
-.granularity-btn:hover {
-  border-color: #5470c6;
-  color: #5470c6;
-}
-
-.granularity-btn.active {
-  background: #5470c6;
-  color: #fff;
-  border-color: #5470c6;
 }
 
 .chart {
@@ -489,47 +475,61 @@ watch(() => props.data, () => {
   min-height: 400px;
 }
 
-.loading, .no-data {
+.granularity-controls {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 400px;
-  color: #999;
-  font-size: 16px;
+  gap: 0.5rem;
 }
 
-.chart-summary {
-  display: flex;
-  justify-content: space-around;
-  margin-top: 20px;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 6px;
-  border: 1px solid #e9ecef;
+.granularity-btn {
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.5rem;
+  border: none;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.summary-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.granularity-btn.active {
+  background-color: #3b82f6;
+  color: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.granularity-btn:not(.active) {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.granularity-btn:not(.active):hover {
+  background-color: #e5e7eb;
+}
+
+.summary-card {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
 
 .summary-label {
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 5px;
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
 }
 
 .summary-value {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 0.25rem;
 }
 
 .summary-value.positive {
-  color: #91cc75;
+  color: #059669;
 }
 
 .summary-value.negative {
-  color: #ee6666;
+  color: #dc2626;
 }
 </style>

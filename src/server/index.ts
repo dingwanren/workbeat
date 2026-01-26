@@ -1,7 +1,7 @@
 import express, { Request, Response, Application } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync, readdirSync, readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { shortenFieldNames, compactParentHashesAndTimestamps } from '../utils/shortenFieldNames';
 import { injectChunkedData } from '../utils/chunkData';
 
@@ -138,6 +138,7 @@ private setupRoutesAndMiddleware(): void {
       res.send(html);
 
     } catch (error) {
+      console.log(error)
       res.status(500).send('服务器内部错误');
     }
   }

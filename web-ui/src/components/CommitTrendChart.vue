@@ -1,21 +1,33 @@
 <template>
-  <div class="commit-trend-chart">
-    <div class="chart-header">
-      <h3>提交趋势图</h3>
+  <div class="commit-trend-chart bg-white p-6 rounded-lg shadow-md card">
+    <div class="chart-header mb-4">
+      <div class="chart-title-container">
+        <h3 class="chart-title">
+          <i class="fas fa-chart-line"></i>
+          提交趋势图
+        </h3>
+      </div>
       <div class="granularity-controls">
-        <button 
-          v-for="opt in granularityOptions" 
+        <button
+          v-for="opt in granularityOptions"
           :key="opt.value"
-          :class="['granularity-btn', { 'active': activeGranularity === opt.value }]"
+          :class="[
+            'granularity-btn',
+            activeGranularity === opt.value ? 'active' : ''
+          ]"
           @click="changeGranularity(opt.value)"
         >
           {{ opt.label }}
         </button>
       </div>
     </div>
-    
-    <div v-if="loading" class="loading">加载图表数据...</div>
-    <div v-else-if="!hasData" class="no-data">暂无提交数据</div>
+
+    <div v-if="loading" class="flex justify-center items-center h-96">
+      <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-primary"></div>
+    </div>
+    <div v-else-if="!hasData" class="flex justify-center items-center h-96 text-gray-500">
+      <p>暂无提交数据</p>
+    </div>
     <VChart
       v-else
       class="chart"
@@ -27,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart } from 'echarts/charts'
@@ -174,16 +186,18 @@ const chartOption = computed(() => {
 
   return {
     title: {
-      text: '提交趋势',
-      left: 'center',
-      textStyle: {
-        fontSize: 16,
-        fontWeight: 'normal'
-      }
+      show: false // Hide title since we have it in the header
     },
     tooltip: {
       trigger: 'axis',
       confine: true, // 限制tooltip在图表区域内
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      borderColor: '#3b82f6',
+      borderWidth: 1,
+      textStyle: {
+        color: '#fff',
+        fontSize: 12
+      },
       formatter: (params) => {
         if (!params || params.length === 0) return ''
         const data = params[0]
@@ -195,7 +209,7 @@ const chartOption = computed(() => {
       left: '3%',
       right: '4%',
       bottom: '15%', // 增加底部空间以容纳DataZoom
-      top: '15%',
+      top: '10%',
       containLabel: true
     },
     xAxis: {
@@ -204,18 +218,30 @@ const chartOption = computed(() => {
       axisLabel: {
         show: shouldShowXAxisLabels.value,
         rotate: processedData.dates.length > 10 ? 45 : 0,
-        interval: 0
+        interval: 0,
+        color: '#6B7280'
       },
       name: granularityText,
       nameLocation: 'middle',
-      nameGap: 30
+      nameGap: 30,
+      axisLine: {
+        lineStyle: {
+          color: '#E5E7EB'
+        }
+      }
     },
     yAxis: {
       type: 'value',
       name: '提交次数',
       minInterval: 1,
       axisLabel: {
-        formatter: '{value} 次'
+        formatter: '{value} 次',
+        color: '#6B7280'
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#E5E7EB'
+        }
       }
     },
     series: [
@@ -224,13 +250,15 @@ const chartOption = computed(() => {
         type: 'line',
         smooth: true,
         symbol: 'circle',
-        symbolSize: 8,
+        symbolSize: 6,
         lineStyle: {
           width: 3,
-          color: '#5470c6'
+          color: '#3b82f6'
         },
         itemStyle: {
-          color: '#5470c6'
+          color: '#3b82f6',
+          borderColor: '#FFF',
+          borderWidth: 2
         },
         areaStyle: {
           color: {
@@ -240,8 +268,8 @@ const chartOption = computed(() => {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(84, 112, 198, 0.5)' },
-              { offset: 1, color: 'rgba(84, 112, 198, 0.1)' }
+              { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
+              { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
             ]
           }
         },
@@ -251,9 +279,10 @@ const chartOption = computed(() => {
             { type: 'max', name: '峰值' },
             { type: 'min', name: '低谷' }
           ],
-          symbolSize: 50,
+          symbolSize: 40,
           label: {
-            formatter: '{b}'
+            formatter: '{b}',
+            fontSize: 10
           }
         }
       }
@@ -275,13 +304,13 @@ const chartOption = computed(() => {
         end: currentVisibleRange.value.end,
         bottom: '3%', // 位置在底部
         height: 20, // 滑块高度
-        borderColor: '#d9d9d9',
-        backgroundColor: 'rgba(194, 207, 211, 0.2)',
-        fillerColor: 'rgba(144, 164, 174, 0.6)',
+        borderColor: '#E5E7EB',
+        backgroundColor: 'rgba(229, 231, 235, 0.3)',
+        fillerColor: 'rgba(59, 130, 246, 0.6)',
         handleIcon: 'M8.2,13.6V3.9H6.3v9.7H3.1v14.9h3.3v9.7h1.8v-9.7h3.3V13.6H8.2z M9.7,24.4H4.8v-1.4h4.9V24.4z M9.7,19.1H4.8v-1.4h4.9V19.1z M9.7,32.2H4.8v-1.4h4.9V32.2z M9.7,26.8H4.8v-1.4h4.9V26.8z M9.7,29.4H4.8v-1.4h4.9V29.4z M9.7,21.7H4.8v-1.4h4.9V21.7z M9.7,34.8H4.8v-1.4h4.9V34.8z M9.7,16.5H4.8v-1.4h4.9V16.5z',
         handleSize: '100%',
         handleStyle: {
-          color: '#fff',
+          color: '#3b82f6',
           shadowBlur: 2,
           shadowColor: 'rgba(0, 0, 0, 0.6)',
           shadowOffsetX: 1,
@@ -317,50 +346,64 @@ watch(() => props.data, () => {
 .commit-trend-chart {
   width: 100%;
   height: 100%;
-  background: #fff;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background-color: white;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .chart-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 1rem;
 }
 
-.chart-header h3 {
-  margin: 0;
-  color: #333;
-  font-size: 18px;
-  font-weight: 600;
+.chart-title-container {
+  display: flex;
+  align-items: center;
+}
+
+.chart-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+}
+
+.chart-title i {
+  margin-right: 0.5rem;
+  color: #3b82f6;
 }
 
 .granularity-controls {
   display: flex;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .granularity-btn {
-  padding: 6px 16px;
-  border: 1px solid #d9d9d9;
-  background: #fff;
-  border-radius: 4px;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.5rem;
+  border: none;
+  font-size: 0.875rem;
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s;
-}
-
-.granularity-btn:hover {
-  border-color: #5470c6;
-  color: #5470c6;
+  transition: all 0.2s ease;
 }
 
 .granularity-btn.active {
-  background: #5470c6;
-  color: #fff;
-  border-color: #5470c6;
+  background-color: #3b82f6;
+  color: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.granularity-btn:not(.active) {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.granularity-btn:not(.active):hover {
+  background-color: #e5e7eb;
 }
 
 .chart {
@@ -373,7 +416,7 @@ watch(() => props.data, () => {
   justify-content: center;
   align-items: center;
   height: 400px;
-  color: #999;
-  font-size: 16px;
+  color: #6b7280;
+  font-size: 1rem;
 }
 </style>
